@@ -1,0 +1,83 @@
+//@version=5
+indicator('FVG 중간캔들 몸통 50% 라인', shorttitle='FVG Mid 50%', overlay=true)
+
+// ══════════════════════════════════════════════════════
+//  설정
+// ══════════════════════════════════════════════════════
+grp = 'FVG 설정'
+bullColor    = input.color(color.new(color.lime, 0), '상승 FVG 색상',  group=grp)
+bearColor    = input.color(color.new(color.red,  0), '하락 FVG 색상',  group=grp)
+lineWidth    = input.int(1, '라인 굵기', minval=1, maxval=4, group=grp)
+lineStyleInp = input.string('dashed', '라인 스타일', options=['solid','dashed','dotted'], group=grp)
+showLabel    = input.bool(true, '레이블 표시', group=grp)
+autoDelete   = input.bool(true, '가격 교차 시 자동 삭제', group=grp)
+maxLines     = input.int(30, '최대 라인 수', minval=5, maxval=100, group=grp)
+
+// ══════════════════════════════════════════════════════
+//  라인 스타일 변환
+// ══════════════════════════════════════════════════════
+lstyle = lineStyleInp == 'dashed' ? line.style_dashed : lineStyleInp == 'dotted' ? line.style_dotted : line.style_solid
+
+// ══════════════════════════════════════════════════════
+//  FVG 감지
+//  ┌─────────────────────────────────────────────────┐
+//  │ 3봉 패턴:  candle[2]  ←  candle[1]  ←  candle[0] │
+//  │ 상승 FVG:  high[2] < low[0]  (갭 상승)           │
+//  │ 하락 FVG:  low[2]  > high[0] (갭 하락)           │
+//  │ 50% 라인:  (open[1] + close[1]) / 2             │
+//  └─────────────────────────────────────────────────┘
+// ══════════════════════════════════════════════════════
+isBullFVG = high[2] < low[0]
+isBearFVG = low[2]  > high[0]
+
+// 중간 캔들(1봉 전)의 몸통 중간점
+midBody = (open[1] + close[1]) / 2.0
+
+// ══════════════════════════════════════════════════════
+//  배열 (라인·레이블·레벨·방향 추적)
+// ══════════════════════════════════════════════════════
+var line[]  lineArr  = array.new_line()
+var label[] labelArr = array.new_label()
+var float[] levelArr = array.new_float()
+var bool[]  isBullA  = array.new_bool()
+
+// ── 1. 교차 시 라인 삭제 (역순 순회) ─────────────────
+if autoDelete
+    i = array.size(lineArr) - 1
+    while i >= 0
+        lv   = array.get(levelArr, i)
+        bull = array.get(isBullA, i)
+        // 상승 FVG: 종가가 라인 아래로 / 하락 FVG: 종가가 라인 위로 돌파 시 삭제
+        if (bull and close < lv) or (not bull and close > lv)
+            line.delete(array.get(lineArr, i))
+            label.delete(array.get(labelArr, i))
+            array.remove(lineArr,  i)
+            array.remove(labelArr, i)
+            array.remove(levelArr, i)
+            array.remove(isBullA,  i)
+        i -= 1
+
+// ── 2. 최대 수 초과 → 오래된 것 삭제 ─────────────────
+while array.size(lineArr) >= maxLines
+    line.delete(array.shift(lineArr))
+    label.delete(array.shift(labelArr))
+    array.shift(levelArr)
+    array.shift(isBullA)
+
+// ── 3. 신규 FVG → 50% 라인 생성 ──────────────────────
+if isBullFVG or isBearFVG
+    col = isBullFVG ? bullColor : bearColor
+    lbl = isBullFVG ? '▲ 50%' : '▼ 50%'
+
+    // 라인 시작: 중간 캔들 위치(bar_index-1), 우측 무한 연장
+    l = line.new(bar_index - 1, midBody, bar_index, midBody,
+                 color=col, width=lineWidth, style=lstyle, extend=extend.right)
+    array.push(lineArr,  l)
+    array.push(levelArr, midBody)
+    array.push(isBullA,  isBullFVG)
+
+    // 레이블: 중간 캔들 오른쪽에 텍스트 표시
+    lb = label.new(bar_index - 1, midBody, showLabel ? lbl : '',
+                   color=color.new(col, 70), textcolor=col,
+                   style=label.style_label_right, size=size.small)
+    array.push(labelArr, lb)
