@@ -1,0 +1,130 @@
+//@version=5
+indicator('EMA 정배열/역배열 (9·25·50·200)', shorttitle='EMA Align', overlay=true)
+
+// ══════════════════════════════════════════════════════
+//  설정
+// ══════════════════════════════════════════════════════
+grpMA = 'EMA 설정'
+src      = input.source(close, '소스', group=grpMA)
+lineW1   = input.int(1, '단기선 굵기(9·25)', minval=1, maxval=4, group=grpMA)
+lineW2   = input.int(2, '장기선 굵기(50·200)', minval=1, maxval=4, group=grpMA)
+colE9    = input.color(#FF6B6B, 'EMA 9   색상', group=grpMA)
+colE25   = input.color(#FFD93D, 'EMA 25  색상', group=grpMA)
+colE50   = input.color(#6BCB77, 'EMA 50  색상', group=grpMA)
+colE200  = input.color(#4D96FF, 'EMA 200 색상', group=grpMA)
+
+grpTbl = '테이블 설정'
+tblPos  = input.string('top_right', '위치', options=['top_right','top_left','bottom_right','bottom_left'], group=grpTbl)
+tblSize = input.string('normal', '크기', options=['tiny','small','normal','large'], group=grpTbl)
+showBg  = input.bool(true, '정배열/역배열 배경색', group=grpTbl)
+
+// ══════════════════════════════════════════════════════
+//  EMA 계산
+// ══════════════════════════════════════════════════════
+e9   = ta.ema(src,   9)
+e25  = ta.ema(src,  25)
+e50  = ta.ema(src,  50)
+e200 = ta.ema(src, 200)
+
+// ══════════════════════════════════════════════════════
+//  라인 표시
+// ══════════════════════════════════════════════════════
+plot(e9,   'EMA 9',   color=colE9,   linewidth=lineW1)
+plot(e25,  'EMA 25',  color=colE25,  linewidth=lineW1)
+plot(e50,  'EMA 50',  color=colE50,  linewidth=lineW2)
+plot(e200, 'EMA 200', color=colE200, linewidth=lineW2)
+
+// ══════════════════════════════════════════════════════
+//  정배열 / 역배열 판단
+// ══════════════════════════════════════════════════════
+// 각 조건 (총 4단계)
+c1 = close > e9    // 가격 > EMA9
+c2 = e9    > e25   // EMA9 > EMA25
+c3 = e25   > e50   // EMA25 > EMA50
+c4 = e50   > e200  // EMA50 > EMA200
+
+bullCount = (c1 ? 1 : 0) + (c2 ? 1 : 0) + (c3 ? 1 : 0) + (c4 ? 1 : 0)
+bearCount = (not c1 ? 1 : 0) + (not c2 ? 1 : 0) + (not c3 ? 1 : 0) + (not c4 ? 1 : 0)
+
+fullBull  = bullCount == 4
+fullBear  = bearCount == 4
+partBull  = bullCount == 3
+partBear  = bearCount == 3
+
+alignText = fullBull ? '완전 정배열' : fullBear ? '완전 역배열' : partBull ? '부분 정배열' : partBear ? '부분 역배열' : '혼재'
+alignCol  = fullBull ? color.lime    : fullBear ? color.red     : partBull ? #6BCB77       : partBear ? color.orange   : color.gray
+
+// ══════════════════════════════════════════════════════
+//  배경색
+// ══════════════════════════════════════════════════════
+bgcolor(showBg and fullBull ? color.new(color.lime, 93) : showBg and fullBear ? color.new(color.red, 93) : na, title='정배열/역배열 배경')
+
+// ══════════════════════════════════════════════════════
+//  헬퍼 함수
+// ══════════════════════════════════════════════════════
+f_pos(p) =>
+    if p == 'top_left'
+        position.top_left
+    else if p == 'bottom_right'
+        position.bottom_right
+    else if p == 'bottom_left'
+        position.bottom_left
+    else
+        position.top_right
+
+f_size(s) =>
+    if s == 'tiny'
+        size.tiny
+    else if s == 'small'
+        size.small
+    else if s == 'large'
+        size.large
+    else
+        size.normal
+
+// ══════════════════════════════════════════════════════
+//  정보 테이블
+// ══════════════════════════════════════════════════════
+var table tbl = table.new(f_pos(tblPos), 3, 7,
+     bgcolor=color.new(color.black, 75),
+     border_width=1, border_color=color.new(color.gray, 50))
+
+if barstate.islast
+    sz   = f_size(tblSize)
+    hBg  = color.new(#1E3A5F, 20)
+    hTxt = color.white
+
+    // 헤더
+    table.cell(tbl, 0, 0, 'EMA',   text_color=hTxt, text_size=sz, bgcolor=hBg)
+    table.cell(tbl, 1, 0, '현재값', text_color=hTxt, text_size=sz, bgcolor=hBg)
+    table.cell(tbl, 2, 0, '순서',   text_color=hTxt, text_size=sz, bgcolor=hBg)
+
+    // EMA 9  — 가격 vs EMA9
+    table.cell(tbl, 0, 1, 'EMA 9',  text_color=colE9,  text_size=sz)
+    table.cell(tbl, 1, 1, str.tostring(e9,   '#.00'), text_color=colE9,  text_size=sz)
+    table.cell(tbl, 2, 1, c1 ? '▲ 가격>9' : '▼ 가격<9', text_color=c1 ? color.lime : color.red, text_size=sz)
+
+    // EMA 25 — EMA9 vs EMA25
+    table.cell(tbl, 0, 2, 'EMA 25', text_color=colE25, text_size=sz)
+    table.cell(tbl, 1, 2, str.tostring(e25,  '#.00'), text_color=colE25, text_size=sz)
+    table.cell(tbl, 2, 2, c2 ? '▲ 9>25'   : '▼ 9<25',   text_color=c2 ? color.lime : color.red, text_size=sz)
+
+    // EMA 50 — EMA25 vs EMA50
+    table.cell(tbl, 0, 3, 'EMA 50', text_color=colE50, text_size=sz)
+    table.cell(tbl, 1, 3, str.tostring(e50,  '#.00'), text_color=colE50, text_size=sz)
+    table.cell(tbl, 2, 3, c3 ? '▲ 25>50'  : '▼ 25<50',  text_color=c3 ? color.lime : color.red, text_size=sz)
+
+    // EMA 200 — EMA50 vs EMA200
+    table.cell(tbl, 0, 4, 'EMA 200',text_color=colE200,text_size=sz)
+    table.cell(tbl, 1, 4, str.tostring(e200, '#.00'), text_color=colE200,text_size=sz)
+    table.cell(tbl, 2, 4, c4 ? '▲ 50>200' : '▼ 50<200', text_color=c4 ? color.lime : color.red, text_size=sz)
+
+    // 구분선
+    table.cell(tbl, 0, 5, '──', text_color=color.gray, text_size=sz)
+    table.cell(tbl, 1, 5, '──', text_color=color.gray, text_size=sz)
+    table.cell(tbl, 2, 5, '──', text_color=color.gray, text_size=sz)
+
+    // 배열 상태
+    table.cell(tbl, 0, 6, '배열',  text_color=color.white, text_size=sz, bgcolor=color.new(alignCol, 60))
+    table.cell(tbl, 1, 6, alignText, text_color=alignCol, text_size=sz)
+    table.cell(tbl, 2, 6, str.tostring(bullCount) + ' / 4', text_color=color.white, text_size=sz)

@@ -1,0 +1,133 @@
+//@version=5
+indicator('DEMA 정배열/역배열 (9·25·50·200)', shorttitle='DEMA Align', overlay=true)
+
+// ══════════════════════════════════════════════════════
+//  설정
+// ══════════════════════════════════════════════════════
+grpMA = 'DEMA 설정'
+src      = input.source(close, '소스', group=grpMA)
+lineW1   = input.int(1, '단기선 굵기(9·25)', minval=1, maxval=4, group=grpMA)
+lineW2   = input.int(2, '장기선 굵기(50·200)', minval=1, maxval=4, group=grpMA)
+colD9    = input.color(#FF6B6B, 'DEMA 9   색상', group=grpMA)
+colD25   = input.color(#FFD93D, 'DEMA 25  색상', group=grpMA)
+colD50   = input.color(#6BCB77, 'DEMA 50  색상', group=grpMA)
+colD200  = input.color(#4D96FF, 'DEMA 200 색상', group=grpMA)
+
+grpTbl = '테이블 설정'
+tblPos  = input.string('top_right', '위치', options=['top_right','top_left','bottom_right','bottom_left'], group=grpTbl)
+tblSize = input.string('normal', '크기', options=['tiny','small','normal','large'], group=grpTbl)
+showBg  = input.bool(true, '정배열/역배열 배경색', group=grpTbl)
+
+// ══════════════════════════════════════════════════════
+//  DEMA 계산  →  DEMA(n) = 2×EMA(n) − EMA(EMA(n))
+// ══════════════════════════════════════════════════════
+dema(s, n) =>
+    e = ta.ema(s, n)
+    2.0 * e - ta.ema(e, n)
+
+d9   = dema(src,   9)
+d25  = dema(src,  25)
+d50  = dema(src,  50)
+d200 = dema(src, 200)
+
+// ══════════════════════════════════════════════════════
+//  라인 표시
+// ══════════════════════════════════════════════════════
+plot(d9,   'DEMA 9',   color=colD9,   linewidth=lineW1)
+plot(d25,  'DEMA 25',  color=colD25,  linewidth=lineW1)
+plot(d50,  'DEMA 50',  color=colD50,  linewidth=lineW2)
+plot(d200, 'DEMA 200', color=colD200, linewidth=lineW2)
+
+// ══════════════════════════════════════════════════════
+//  정배열 / 역배열 판단
+// ══════════════════════════════════════════════════════
+c1 = close > d9    // 가격 > DEMA9
+c2 = d9    > d25   // DEMA9 > DEMA25
+c3 = d25   > d50   // DEMA25 > DEMA50
+c4 = d50   > d200  // DEMA50 > DEMA200
+
+bullCount = (c1 ? 1 : 0) + (c2 ? 1 : 0) + (c3 ? 1 : 0) + (c4 ? 1 : 0)
+bearCount = (not c1 ? 1 : 0) + (not c2 ? 1 : 0) + (not c3 ? 1 : 0) + (not c4 ? 1 : 0)
+
+fullBull  = bullCount == 4
+fullBear  = bearCount == 4
+partBull  = bullCount == 3
+partBear  = bearCount == 3
+
+alignText = fullBull ? '완전 정배열' : fullBear ? '완전 역배열' : partBull ? '부분 정배열' : partBear ? '부분 역배열' : '혼재'
+alignCol  = fullBull ? color.lime    : fullBear ? color.red     : partBull ? #6BCB77       : partBear ? color.orange   : color.gray
+
+// ══════════════════════════════════════════════════════
+//  배경색
+// ══════════════════════════════════════════════════════
+bgcolor(showBg and fullBull ? color.new(color.lime, 93) : showBg and fullBear ? color.new(color.red, 93) : na, title='정배열/역배열 배경')
+
+// ══════════════════════════════════════════════════════
+//  헬퍼 함수
+// ══════════════════════════════════════════════════════
+f_pos(p) =>
+    if p == 'top_left'
+        position.top_left
+    else if p == 'bottom_right'
+        position.bottom_right
+    else if p == 'bottom_left'
+        position.bottom_left
+    else
+        position.top_right
+
+f_size(s) =>
+    if s == 'tiny'
+        size.tiny
+    else if s == 'small'
+        size.small
+    else if s == 'large'
+        size.large
+    else
+        size.normal
+
+// ══════════════════════════════════════════════════════
+//  정보 테이블
+// ══════════════════════════════════════════════════════
+var table tbl = table.new(f_pos(tblPos), 3, 7,
+     bgcolor=color.new(color.black, 75),
+     border_width=1, border_color=color.new(color.gray, 50))
+
+if barstate.islast
+    sz   = f_size(tblSize)
+    hBg  = color.new(#3A1E5F, 20)
+    hTxt = color.white
+
+    // 헤더
+    table.cell(tbl, 0, 0, 'DEMA',  text_color=hTxt, text_size=sz, bgcolor=hBg)
+    table.cell(tbl, 1, 0, '현재값', text_color=hTxt, text_size=sz, bgcolor=hBg)
+    table.cell(tbl, 2, 0, '순서',   text_color=hTxt, text_size=sz, bgcolor=hBg)
+
+    // DEMA 9
+    table.cell(tbl, 0, 1, 'DEMA 9',  text_color=colD9,  text_size=sz)
+    table.cell(tbl, 1, 1, str.tostring(d9,   '#.00'), text_color=colD9,  text_size=sz)
+    table.cell(tbl, 2, 1, c1 ? '▲ 가격>9' : '▼ 가격<9', text_color=c1 ? color.lime : color.red, text_size=sz)
+
+    // DEMA 25
+    table.cell(tbl, 0, 2, 'DEMA 25', text_color=colD25, text_size=sz)
+    table.cell(tbl, 1, 2, str.tostring(d25,  '#.00'), text_color=colD25, text_size=sz)
+    table.cell(tbl, 2, 2, c2 ? '▲ 9>25'   : '▼ 9<25',   text_color=c2 ? color.lime : color.red, text_size=sz)
+
+    // DEMA 50
+    table.cell(tbl, 0, 3, 'DEMA 50', text_color=colD50, text_size=sz)
+    table.cell(tbl, 1, 3, str.tostring(d50,  '#.00'), text_color=colD50, text_size=sz)
+    table.cell(tbl, 2, 3, c3 ? '▲ 25>50'  : '▼ 25<50',  text_color=c3 ? color.lime : color.red, text_size=sz)
+
+    // DEMA 200
+    table.cell(tbl, 0, 4, 'DEMA 200',text_color=colD200,text_size=sz)
+    table.cell(tbl, 1, 4, str.tostring(d200, '#.00'), text_color=colD200,text_size=sz)
+    table.cell(tbl, 2, 4, c4 ? '▲ 50>200' : '▼ 50<200', text_color=c4 ? color.lime : color.red, text_size=sz)
+
+    // 구분선
+    table.cell(tbl, 0, 5, '──', text_color=color.gray, text_size=sz)
+    table.cell(tbl, 1, 5, '──', text_color=color.gray, text_size=sz)
+    table.cell(tbl, 2, 5, '──', text_color=color.gray, text_size=sz)
+
+    // 배열 상태
+    table.cell(tbl, 0, 6, '배열',  text_color=color.white, text_size=sz, bgcolor=color.new(alignCol, 60))
+    table.cell(tbl, 1, 6, alignText, text_color=alignCol, text_size=sz)
+    table.cell(tbl, 2, 6, str.tostring(bullCount) + ' / 4', text_color=color.white, text_size=sz)
