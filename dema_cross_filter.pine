@@ -83,20 +83,27 @@ fill(e233Plot, pricePlot,
 
 // ══════════════════════════════════════════════════════
 //  신호 화살표
+//  plotshape의 size는 const string 필요 → 조건별로 분리
 // ══════════════════════════════════════════════════════
-sz = f_size(sigSize)
+gcTiny   = showGC and buySignal  and sigSize == 'tiny'
+gcSmall  = showGC and buySignal  and sigSize == 'small'
+gcNormal = showGC and buySignal  and sigSize == 'normal'
+gcLarge  = showGC and buySignal  and sigSize == 'large'
 
-plotshape(showGC and buySignal,
-     title='골든크로스', style=shape.labelup,
-     location=location.belowbar,
-     color=color.new(color.lime, 0), textcolor=color.black,
-     text='GC', size=sz)
+dcTiny   = showDC and sellSignal and sigSize == 'tiny'
+dcSmall  = showDC and sellSignal and sigSize == 'small'
+dcNormal = showDC and sellSignal and sigSize == 'normal'
+dcLarge  = showDC and sellSignal and sigSize == 'large'
 
-plotshape(showDC and sellSignal,
-     title='데드크로스', style=shape.labeldown,
-     location=location.abovebar,
-     color=color.new(color.red, 0), textcolor=color.white,
-     text='DC', size=sz)
+plotshape(gcTiny,   title='골든크로스', style=shape.labelup,   location=location.belowbar, color=color.new(color.lime,0), textcolor=color.black, text='GC', size=size.tiny)
+plotshape(gcSmall,  title='골든크로스', style=shape.labelup,   location=location.belowbar, color=color.new(color.lime,0), textcolor=color.black, text='GC', size=size.small)
+plotshape(gcNormal, title='골든크로스', style=shape.labelup,   location=location.belowbar, color=color.new(color.lime,0), textcolor=color.black, text='GC', size=size.normal)
+plotshape(gcLarge,  title='골든크로스', style=shape.labelup,   location=location.belowbar, color=color.new(color.lime,0), textcolor=color.black, text='GC', size=size.large)
+
+plotshape(dcTiny,   title='데드크로스', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),  textcolor=color.white, text='DC', size=size.tiny)
+plotshape(dcSmall,  title='데드크로스', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),  textcolor=color.white, text='DC', size=size.small)
+plotshape(dcNormal, title='데드크로스', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),  textcolor=color.white, text='DC', size=size.normal)
+plotshape(dcLarge,  title='데드크로스', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),  textcolor=color.white, text='DC', size=size.large)
 
 // ══════════════════════════════════════════════════════
 //  배경색 · 캔들 색상
