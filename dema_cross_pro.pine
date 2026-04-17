@@ -120,16 +120,19 @@ isDC = ta.crossunder(dFast, dSlow)
 
 var int lastGC = -999
 var int lastDC = -999
-if isGC
-    lastGC := bar_index
-if isDC
-    lastDC := bar_index
 
+// 쿨다운 체크를 업데이트보다 먼저 — 업데이트 후 체크하면 항상 0>=N 으로 차단됨
 gcCoolOk = not useCooldown or (bar_index - lastGC) >= cooldownBar
 dcCoolOk = not useCooldown or (bar_index - lastDC) >= cooldownBar
 
 buySignal  = isGC and aboveEMA and adxOk and gapOk and gcCoolOk and rsiGcOk
 sellSignal = isDC and belowEMA and adxOk and gapOk and dcCoolOk and rsiDcOk
+
+// 신호 발생 후 쿨다운 타이머 업데이트
+if buySignal
+    lastGC := bar_index
+if sellSignal
+    lastDC := bar_index
 
 // 추세 전환 (DEMA단기가 EMA필터 돌파)
 bullFlip = showFlip and ta.crossover(dFast,  eTrend)
@@ -276,8 +279,10 @@ if barstate.islast
     table.cell(tbl,1,5,aboveEMA?'▲ 상승장':'▼ 하락장', text_color=trendCol, text_size=ts)
     table.cell(tbl,0,6,'ADX 필터', text_color=color.white, text_size=ts)
     table.cell(tbl,1,6,useAdx?(adxVal>adxThresh?'✅ 통과':'❌ 차단'):'⬜ 비사용', text_color=adxCol, text_size=ts)
+    rsiFilterTxt = not useRsi ? '⬜ 비사용' : aboveEMA ? (rsiVal>=rsiBull?'✅ 매수OK':'❌ RSI낮음') : (rsiVal<=rsiBear?'✅ 매도OK':'❌ RSI높음')
+    rsiFilterCol = not useRsi ? color.gray : aboveEMA ? (rsiVal>=rsiBull?color.lime:color.orange) : (rsiVal<=rsiBear?color.lime:color.orange)
     table.cell(tbl,0,7,'RSI 필터', text_color=color.white, text_size=ts)
-    table.cell(tbl,1,7,useRsi?(rsiVal>=rsiBull or rsiVal<=rsiBear?'✅ 통과':'❌ 차단'):'⬜ 비사용', text_color=rsiCol, text_size=ts)
+    table.cell(tbl,1,7,rsiFilterTxt, text_color=rsiFilterCol, text_size=ts)
     table.cell(tbl,0,8,'신호', text_color=color.white, text_size=ts)
     table.cell(tbl,1,8,crossTxt, text_color=crossCol, text_size=ts)
 
