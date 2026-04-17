@@ -1,25 +1,46 @@
 //@version=5
-indicator('DEMA 8/21 크로스 × EMA233 필터', shorttitle='DEMA Cross Filter', overlay=true)
+indicator('DEMA 크로스 × EMA 필터 (노이즈 감소)', shorttitle='DEMA Cross+', overlay=true)
 
 // ══════════════════════════════════════════════════════
-//  설정
+//  라인 설정
 // ══════════════════════════════════════════════════════
 grpLine = '라인 설정'
-src     = input.source(close, '소스', group=grpLine)
-colD8   = input.color(#FF6B6B, 'DEMA 8  색상', group=grpLine)
-colD21  = input.color(#FFD93D, 'DEMA 21 색상', group=grpLine)
-colE233 = input.color(#4D96FF, 'EMA 233 색상', group=grpLine)
-lwShort = input.int(2, '단기선 굵기 (8·21)', minval=1, maxval=4, group=grpLine)
-lwLong  = input.int(3, '장기선 굵기 (233)',  minval=1, maxval=4, group=grpLine)
+src       = input.source(close, '소스', group=grpLine)
+fastLen   = input.int(8,   '단기 DEMA 기간', minval=1, maxval=200, group=grpLine)
+slowLen   = input.int(21,  '장기 DEMA 기간', minval=1, maxval=200, group=grpLine)
+trendLen  = input.int(233, 'EMA 필터 기간',  minval=1, maxval=500, group=grpLine)
+colFast   = input.color(#FF6B6B, '단기 DEMA 색상', group=grpLine)
+colSlow   = input.color(#FFD93D, '장기 DEMA 색상', group=grpLine)
+colTrend  = input.color(#4D96FF, 'EMA 필터 색상',  group=grpLine)
+lwShort   = input.int(2, '단기선 굵기', minval=1, maxval=4, group=grpLine)
+lwLong    = input.int(3, '필터선 굵기', minval=1, maxval=4, group=grpLine)
 
-grpSig = '신호 설정'
-showGC  = input.bool(true, '골든크로스 ▲ 표시', group=grpSig)
-showDC  = input.bool(true, '데드크로스  ▼ 표시', group=grpSig)
-showBg  = input.bool(true, 'EMA233 기준 배경색', group=grpSig)
-showBar = input.bool(true, '캔들 색상 변경',     group=grpSig)
+// ══════════════════════════════════════════════════════
+//  노이즈 감소 필터
+// ══════════════════════════════════════════════════════
+grpFilter = '노이즈 감소 필터'
+useAdx      = input.bool(true,  'ADX 필터 사용 (추세 강도)',    group=grpFilter)
+adxThresh   = input.int(20,     'ADX 최소값 (이상일 때 신호)', minval=5, maxval=50, group=grpFilter)
+adxLen      = input.int(14,     'ADX 계산 기간',               minval=5, maxval=50, group=grpFilter)
+useCooldown = input.bool(true,  '쿨다운 (연속 신호 차단)',      group=grpFilter)
+cooldownBar = input.int(5,      '쿨다운 봉 수',                minval=1, maxval=50, group=grpFilter)
+useGap      = input.bool(true,  'DEMA 간격 필터 (가짜 크로스 차단)', group=grpFilter)
+gapMult     = input.float(0.3,  'DEMA 간격 ATR 배수',          minval=0.1, maxval=2.0, step=0.1, group=grpFilter)
+
+// ══════════════════════════════════════════════════════
+//  신호 표시 설정
+// ══════════════════════════════════════════════════════
+grpSig  = '신호 설정'
+showGC  = input.bool(true, '골든크로스 표시', group=grpSig)
+showDC  = input.bool(true, '데드크로스 표시', group=grpSig)
+showBg  = input.bool(true, 'EMA 기준 배경색', group=grpSig)
+showBar = input.bool(true, '캔들 색상 변경',  group=grpSig)
 sigSize = input.string('normal', '신호 크기', options=['tiny','small','normal','large'], group=grpSig)
 
-grpTbl = '테이블 설정'
+// ══════════════════════════════════════════════════════
+//  테이블 설정
+// ══════════════════════════════════════════════════════
+grpTbl  = '테이블 설정'
 tblPos  = input.string('top_right', '위치', options=['top_right','top_left','bottom_right','bottom_left'], group=grpTbl)
 tblSize = input.string('small', '크기', options=['tiny','small','normal','large'], group=grpTbl)
 
@@ -53,101 +74,116 @@ f_size(s) =>
 // ══════════════════════════════════════════════════════
 //  계산
 // ══════════════════════════════════════════════════════
-d8   = dema(src,  8)
-d21  = dema(src, 21)
-e233 = ta.ema(src, 233)
+dFast  = dema(src, fastLen)
+dSlow  = dema(src, slowLen)
+eTrend = ta.ema(src, trendLen)
 
-aboveEMA = close > e233   // EMA233 위 = 상승장
-belowEMA = close < e233   // EMA233 아래 = 하락장
+aboveEMA = close > eTrend
+belowEMA = close < eTrend
+
+// ADX 계산
+[diPlus, diMinus, adxVal] = ta.dmi(adxLen, adxLen)
+adxOk = not useAdx or adxVal > adxThresh
+
+// DEMA 간격 필터 (ATR 기반)
+atr14   = ta.atr(14)
+gapSize = math.abs(dFast - dSlow)
+gapOk   = not useGap or gapSize > atr14 * gapMult
 
 // 크로스 감지
-isGC = ta.crossover(d8, d21)   // DEMA8이 DEMA21 상향 돌파
-isDC = ta.crossunder(d8, d21)  // DEMA8이 DEMA21 하향 돌파
+isGC = ta.crossover(dFast, dSlow)
+isDC = ta.crossunder(dFast, dSlow)
 
-// EMA233 필터 적용
-buySignal  = isGC and aboveEMA  // 골든크로스 + EMA233 위
-sellSignal = isDC and belowEMA  // 데드크로스  + EMA233 아래
+// 쿨다운 (마지막 신호 이후 N봉 경과 여부)
+var int lastGC = -999
+var int lastDC = -999
+if isGC
+    lastGC := bar_index
+if isDC
+    lastDC := bar_index
+
+gcCoolOk = not useCooldown or (bar_index - lastGC) >= cooldownBar
+dcCoolOk = not useCooldown or (bar_index - lastDC) >= cooldownBar
+
+// 최종 신호 (모든 필터 적용)
+buySignal  = isGC and aboveEMA and adxOk and gapOk and gcCoolOk
+sellSignal = isDC and belowEMA and adxOk and gapOk and dcCoolOk
 
 // ══════════════════════════════════════════════════════
 //  라인 표시
 // ══════════════════════════════════════════════════════
-plot(d8,   'DEMA 8',   color=colD8,   linewidth=lwShort)
-plot(d21,  'DEMA 21',  color=colD21,  linewidth=lwShort)
-plot(e233, 'EMA 233',  color=colE233, linewidth=lwLong)
+plot(dFast,  'DEMA 단기', color=colFast,  linewidth=lwShort)
+plot(dSlow,  'DEMA 장기', color=colSlow,  linewidth=lwShort)
+plot(eTrend, 'EMA 필터',  color=colTrend, linewidth=lwLong)
 
-// EMA233 채우기 (가격 위치에 따라 색상)
-e233Plot = plot(e233, display=display.none)
-pricePlot = plot(close, display=display.none)
-fill(e233Plot, pricePlot,
-     color = aboveEMA ? color.new(color.lime, 93) : color.new(color.red, 93))
+eTrendPlot = plot(eTrend, display=display.none)
+pricePlot  = plot(close,  display=display.none)
+fill(eTrendPlot, pricePlot,
+     color=aboveEMA ? color.new(color.lime,93) : color.new(color.red,93))
 
 // ══════════════════════════════════════════════════════
-//  신호 화살표
-//  plotshape의 size는 const string 필요 → 조건별로 분리
+//  신호 화살표 (size별 분리 — Pine Script const string 제약)
 // ══════════════════════════════════════════════════════
-gcTiny   = showGC and buySignal  and sigSize == 'tiny'
-gcSmall  = showGC and buySignal  and sigSize == 'small'
-gcNormal = showGC and buySignal  and sigSize == 'normal'
-gcLarge  = showGC and buySignal  and sigSize == 'large'
+gcT = showGC and buySignal  and sigSize=='tiny'
+gcS = showGC and buySignal  and sigSize=='small'
+gcN = showGC and buySignal  and sigSize=='normal'
+gcL = showGC and buySignal  and sigSize=='large'
+dcT = showDC and sellSignal and sigSize=='tiny'
+dcS = showDC and sellSignal and sigSize=='small'
+dcN = showDC and sellSignal and sigSize=='normal'
+dcL = showDC and sellSignal and sigSize=='large'
 
-dcTiny   = showDC and sellSignal and sigSize == 'tiny'
-dcSmall  = showDC and sellSignal and sigSize == 'small'
-dcNormal = showDC and sellSignal and sigSize == 'normal'
-dcLarge  = showDC and sellSignal and sigSize == 'large'
-
-plotshape(gcTiny,   title='골든크로스', style=shape.labelup,   location=location.belowbar, color=color.new(color.lime,0), textcolor=color.black, text='GC', size=size.tiny)
-plotshape(gcSmall,  title='골든크로스', style=shape.labelup,   location=location.belowbar, color=color.new(color.lime,0), textcolor=color.black, text='GC', size=size.small)
-plotshape(gcNormal, title='골든크로스', style=shape.labelup,   location=location.belowbar, color=color.new(color.lime,0), textcolor=color.black, text='GC', size=size.normal)
-plotshape(gcLarge,  title='골든크로스', style=shape.labelup,   location=location.belowbar, color=color.new(color.lime,0), textcolor=color.black, text='GC', size=size.large)
-
-plotshape(dcTiny,   title='데드크로스', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),  textcolor=color.white, text='DC', size=size.tiny)
-plotshape(dcSmall,  title='데드크로스', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),  textcolor=color.white, text='DC', size=size.small)
-plotshape(dcNormal, title='데드크로스', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),  textcolor=color.white, text='DC', size=size.normal)
-plotshape(dcLarge,  title='데드크로스', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),  textcolor=color.white, text='DC', size=size.large)
+plotshape(gcT, title='GC', style=shape.labelup,   location=location.belowbar, color=color.new(color.lime,0), textcolor=color.black, text='GC', size=size.tiny)
+plotshape(gcS, title='GC', style=shape.labelup,   location=location.belowbar, color=color.new(color.lime,0), textcolor=color.black, text='GC', size=size.small)
+plotshape(gcN, title='GC', style=shape.labelup,   location=location.belowbar, color=color.new(color.lime,0), textcolor=color.black, text='GC', size=size.normal)
+plotshape(gcL, title='GC', style=shape.labelup,   location=location.belowbar, color=color.new(color.lime,0), textcolor=color.black, text='GC', size=size.large)
+plotshape(dcT, title='DC', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),  textcolor=color.white, text='DC', size=size.tiny)
+plotshape(dcS, title='DC', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),  textcolor=color.white, text='DC', size=size.small)
+plotshape(dcN, title='DC', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),  textcolor=color.white, text='DC', size=size.normal)
+plotshape(dcL, title='DC', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),  textcolor=color.white, text='DC', size=size.large)
 
 // ══════════════════════════════════════════════════════
 //  배경색 · 캔들 색상
 // ══════════════════════════════════════════════════════
-bgcolor(showBg and aboveEMA ? color.new(color.lime, 96) :
-        showBg and belowEMA ? color.new(color.red,  96) : na,
-        title='EMA233 배경')
-
-barcolor(showBar and aboveEMA ? color.new(color.lime, 40) :
-         showBar and belowEMA ? color.new(color.red,  40) : na,
-         title='캔들 색상')
+bgcolor(showBg and aboveEMA ? color.new(color.lime,96) :
+        showBg and belowEMA ? color.new(color.red, 96) : na)
+barcolor(showBar and aboveEMA ? color.new(color.lime,40) :
+         showBar and belowEMA ? color.new(color.red, 40) : na)
 
 // ══════════════════════════════════════════════════════
 //  정보 테이블
 // ══════════════════════════════════════════════════════
-var table tbl = table.new(f_pos(tblPos), 2, 5,
-     bgcolor=color.new(color.black, 75),
-     border_width=1, border_color=color.new(color.gray, 60))
+var table tbl = table.new(f_pos(tblPos), 2, 8,
+     bgcolor=color.new(color.black,75),
+     border_width=1, border_color=color.new(color.gray,60))
 
 if barstate.islast
-    ts        = f_size(tblSize)
-    trendCol  = aboveEMA ? color.lime : color.red
-    trendTxt  = aboveEMA ? '▲ 상승장 (골든만)' : '▼ 하락장 (데드만)'
-    crossTxt  = isGC ? '⚡ 골든크로스!' : isDC ? '⚡ 데드크로스!' : '-'
-    crossCol  = isGC ? color.lime : isDC ? color.red : color.gray
+    ts       = f_size(tblSize)
+    trendCol = aboveEMA ? color.lime : color.red
+    trendTxt = aboveEMA ? '▲ 상승장' : '▼ 하락장'
+    adxCol   = adxVal > adxThresh ? color.lime : color.orange
+    crossTxt = buySignal ? '⚡ GC 신호!' : sellSignal ? '⚡ DC 신호!' : '-'
+    crossCol = buySignal ? color.lime : sellSignal ? color.red : color.gray
 
-    table.cell(tbl, 0, 0, 'DEMA 8',  text_color=colD8,  text_size=ts)
-    table.cell(tbl, 1, 0, str.tostring(d8,  '#.00'), text_color=colD8,  text_size=ts)
-
-    table.cell(tbl, 0, 1, 'DEMA 21', text_color=colD21, text_size=ts)
-    table.cell(tbl, 1, 1, str.tostring(d21, '#.00'), text_color=colD21, text_size=ts)
-
-    table.cell(tbl, 0, 2, 'EMA 233', text_color=colE233, text_size=ts)
-    table.cell(tbl, 1, 2, str.tostring(e233,'#.00'), text_color=colE233, text_size=ts)
-
-    table.cell(tbl, 0, 3, '추세', text_color=color.white, text_size=ts,
-               bgcolor=color.new(trendCol, 55))
-    table.cell(tbl, 1, 3, trendTxt, text_color=trendCol, text_size=ts)
-
-    table.cell(tbl, 0, 4, '크로스', text_color=color.white, text_size=ts)
-    table.cell(tbl, 1, 4, crossTxt, text_color=crossCol, text_size=ts)
+    table.cell(tbl,0,0,'DEMA '+str.tostring(fastLen), text_color=colFast,  text_size=ts)
+    table.cell(tbl,1,0,str.tostring(dFast,'#.00'),    text_color=colFast,  text_size=ts)
+    table.cell(tbl,0,1,'DEMA '+str.tostring(slowLen), text_color=colSlow,  text_size=ts)
+    table.cell(tbl,1,1,str.tostring(dSlow,'#.00'),    text_color=colSlow,  text_size=ts)
+    table.cell(tbl,0,2,'EMA '+str.tostring(trendLen), text_color=colTrend, text_size=ts)
+    table.cell(tbl,1,2,str.tostring(eTrend,'#.00'),   text_color=colTrend, text_size=ts)
+    table.cell(tbl,0,3,'ADX('+str.tostring(adxLen)+')', text_color=color.white, text_size=ts)
+    table.cell(tbl,1,3,str.tostring(adxVal,'#.0'),    text_color=adxCol,   text_size=ts)
+    table.cell(tbl,0,4,'추세', text_color=color.white, text_size=ts, bgcolor=color.new(trendCol,55))
+    table.cell(tbl,1,4,trendTxt, text_color=trendCol, text_size=ts)
+    table.cell(tbl,0,5,'ADX 필터', text_color=color.white, text_size=ts)
+    table.cell(tbl,1,5,useAdx ? (adxVal>adxThresh?'✅ 통과':'❌ 차단') : '⬜ 비사용', text_color=adxCol, text_size=ts)
+    table.cell(tbl,0,6,'간격 필터', text_color=color.white, text_size=ts)
+    table.cell(tbl,1,6,useGap ? (gapOk?'✅ 통과':'❌ 차단') : '⬜ 비사용', text_color=gapOk?color.lime:color.orange, text_size=ts)
+    table.cell(tbl,0,7,'신호', text_color=color.white, text_size=ts)
+    table.cell(tbl,1,7,crossTxt, text_color=crossCol, text_size=ts)
 
 // ══════════════════════════════════════════════════════
 //  알림
 // ══════════════════════════════════════════════════════
-alertcondition(buySignal,  '🟢 골든크로스 (EMA233 위)', 'DEMA8/21 골든크로스 — EMA233 위 매수 신호')
-alertcondition(sellSignal, '🔴 데드크로스 (EMA233 아래)', 'DEMA8/21 데드크로스 — EMA233 아래 매도 신호')
+alertcondition(buySignal,  '🟢 골든크로스 신호', 'DEMA 골든크로스 — 매수 신호 (필터 통과)')
+alertcondition(sellSignal, '🔴 데드크로스 신호', 'DEMA 데드크로스 — 매도 신호 (필터 통과)')
