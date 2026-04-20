@@ -9,14 +9,12 @@ src     = input.source(close, '소스', group=grpMA)
 demaLen = input.int(13, 'DEMA 기간', minval=1, maxval=200, group=grpMA)
 ema1Len = input.int(13, 'EMA1 기간', minval=1, maxval=200, group=grpMA)
 ema2Len = input.int(21, 'EMA2 기간', minval=1, maxval=200, group=grpMA)
-colDema = input.color(#FF6B6B, 'DEMA 색상', group=grpMA)
-colEma1 = input.color(#FFD93D, 'EMA1 색상', group=grpMA)
-colEma2 = input.color(#4D96FF, 'EMA2 색상', group=grpMA)
-lwD     = input.int(2, 'DEMA 굵기', minval=1, maxval=5, group=grpMA)
-lwE     = input.int(1, 'EMA  굵기', minval=1, maxval=5, group=grpMA)
 
-grpSig = '신호 설정'
-showBg  = input.bool(true, '정배열/역배열 배경색', group=grpSig)
+grpSig = '표시 설정'
+showLine  = input.bool(false, '이동평균선 표시', group=grpSig)
+showBar   = input.bool(true,  '캔들 색상 변경',  group=grpSig)
+showDot   = input.bool(true,  '캔들 위아래 점 표시', group=grpSig)
+showBg    = input.bool(true,  '배경색 표시',     group=grpSig)
 
 grpTbl  = '테이블 설정'
 tblPos  = input.string('top_right', '위치', options=['top_right','top_left','bottom_right','bottom_left'], group=grpTbl)
@@ -56,33 +54,41 @@ d13 = dema(src, demaLen)
 e13 = ta.ema(src, ema1Len)
 e21 = ta.ema(src, ema2Len)
 
-// ══════════════════════════════════════════════════════
-//  정배열 / 역배열 판단
-//  정배열: DEMA13 > EMA13 > EMA21  (빠른 순서대로 위)
-//  역배열: DEMA13 < EMA13 < EMA21  (빠른 순서대로 아래)
-// ══════════════════════════════════════════════════════
+// 정배열: DEMA13 > EMA13 > EMA21
+// 역배열: DEMA13 < EMA13 < EMA21
 isBull = d13 > e13 and e13 > e21
 isBear = d13 < e13 and e13 < e21
 
-// 전환 시점 감지 (이전 봉에는 없었는데 이번 봉에 완성)
 bullStart = isBull and not isBull[1]
 bearStart = isBear and not isBear[1]
 
 // ══════════════════════════════════════════════════════
-//  라인 표시
+//  이동평균선 (선택 표시)
 // ══════════════════════════════════════════════════════
-plot(d13, 'DEMA ' + str.tostring(demaLen), color=colDema, linewidth=lwD)
-plot(e13, 'EMA '  + str.tostring(ema1Len), color=colEma1, linewidth=lwE)
-plot(e21, 'EMA '  + str.tostring(ema2Len), color=colEma2, linewidth=lwE)
+maVis = showLine ? display.all : display.none
+plot(d13, 'DEMA13', color=#FF6B6B, linewidth=2, display=maVis)
+plot(e13, 'EMA13',  color=#FFD93D, linewidth=1, display=maVis)
+plot(e21, 'EMA21',  color=#4D96FF, linewidth=1, display=maVis)
 
 // ══════════════════════════════════════════════════════
-//  배경색 (정배열/역배열 유지 중 표시)
+//  캔들 색상 (조건 성립 캔들 전체)
+// ══════════════════════════════════════════════════════
+barcolor(showBar and isBull ? color.new(color.lime, 30) : showBar and isBear ? color.new(color.red, 30) : na, title='캔들 색상')
+
+// ══════════════════════════════════════════════════════
+//  배경색
 // ══════════════════════════════════════════════════════
 bgCol = showBg and isBull ? color.new(color.lime, 92) : showBg and isBear ? color.new(color.red, 92) : na
-bgcolor(bgCol, title='정배열/역배열 배경')
+bgcolor(bgCol, title='배경색')
 
 // ══════════════════════════════════════════════════════
-//  신호 마커 (전환 시점에만 표시)
+//  점 마커 (조건 성립 캔들마다 표시)
+// ══════════════════════════════════════════════════════
+plotshape(showDot and isBull, title='정배열 점', style=shape.circle, location=location.belowbar, color=color.lime, size=size.tiny)
+plotshape(showDot and isBear, title='역배열 점', style=shape.circle, location=location.abovebar, color=color.red,  size=size.tiny)
+
+// ══════════════════════════════════════════════════════
+//  전환 라벨 (정배열/역배열 처음 성립할 때)
 // ══════════════════════════════════════════════════════
 plotshape(bullStart, title='정배열 시작', style=shape.labelup,   location=location.belowbar, color=color.lime, textcolor=color.black, text='정배열', size=size.normal)
 plotshape(bearStart, title='역배열 시작', style=shape.labeldown, location=location.abovebar, color=color.red,  textcolor=color.white, text='역배열', size=size.normal)
@@ -93,24 +99,19 @@ plotshape(bearStart, title='역배열 시작', style=shape.labeldown, location=l
 var table tbl = table.new(f_pos(tblPos), 2, 5, bgcolor=color.new(color.black, 75), border_width=1, border_color=color.new(color.gray, 55))
 
 if barstate.islast
-    sz  = f_size(tblSize)
-    hBg = color.new(#1A1A2E, 10)
-
+    sz       = f_size(tblSize)
+    hBg      = color.new(#1A1A2E, 10)
     stateTxt = isBull ? '정배열' : isBear ? '역배열' : '혼재'
     stateCol = isBull ? color.lime : isBear ? color.red : color.orange
 
     table.cell(tbl, 0, 0, '지표',   text_color=color.white, text_size=sz, bgcolor=hBg)
     table.cell(tbl, 1, 0, '현재값', text_color=color.white, text_size=sz, bgcolor=hBg)
-
-    table.cell(tbl, 0, 1, 'DEMA ' + str.tostring(demaLen), text_color=colDema, text_size=sz)
-    table.cell(tbl, 1, 1, str.tostring(d13, '#.00'),        text_color=colDema, text_size=sz)
-
-    table.cell(tbl, 0, 2, 'EMA '  + str.tostring(ema1Len), text_color=colEma1, text_size=sz)
-    table.cell(tbl, 1, 2, str.tostring(e13, '#.00'),        text_color=colEma1, text_size=sz)
-
-    table.cell(tbl, 0, 3, 'EMA '  + str.tostring(ema2Len), text_color=colEma2, text_size=sz)
-    table.cell(tbl, 1, 3, str.tostring(e21, '#.00'),        text_color=colEma2, text_size=sz)
-
+    table.cell(tbl, 0, 1, 'DEMA13', text_color=#FF6B6B, text_size=sz)
+    table.cell(tbl, 1, 1, str.tostring(d13, '#.00'), text_color=#FF6B6B, text_size=sz)
+    table.cell(tbl, 0, 2, 'EMA13',  text_color=#FFD93D, text_size=sz)
+    table.cell(tbl, 1, 2, str.tostring(e13, '#.00'), text_color=#FFD93D, text_size=sz)
+    table.cell(tbl, 0, 3, 'EMA21',  text_color=#4D96FF, text_size=sz)
+    table.cell(tbl, 1, 3, str.tostring(e21, '#.00'), text_color=#4D96FF, text_size=sz)
     table.cell(tbl, 0, 4, '배열 상태', text_color=color.white, text_size=sz, bgcolor=color.new(stateCol, 60))
     table.cell(tbl, 1, 4, stateTxt,    text_color=stateCol,    text_size=sz, bgcolor=color.new(stateCol, 80))
 
