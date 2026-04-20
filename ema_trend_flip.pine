@@ -38,14 +38,24 @@ tblSize = input.string('small', '크기', options=['tiny','small','normal','larg
 //  헬퍼 함수
 // ══════════════════════════════════════════════════════
 f_pos(p) =>
-    p == 'top_left'     ? position.top_left     :
-    p == 'bottom_right' ? position.bottom_right :
-    p == 'bottom_left'  ? position.bottom_left  : position.top_right
+    if p == 'top_left'
+        position.top_left
+    else if p == 'bottom_right'
+        position.bottom_right
+    else if p == 'bottom_left'
+        position.bottom_left
+    else
+        position.top_right
 
 f_size(s) =>
-    s == 'tiny'  ? size.tiny  :
-    s == 'small' ? size.small :
-    s == 'large' ? size.large : size.normal
+    if s == 'tiny'
+        size.tiny
+    else if s == 'small'
+        size.small
+    else if s == 'large'
+        size.large
+    else
+        size.normal
 
 // ══════════════════════════════════════════════════════
 //  EMA 계산
