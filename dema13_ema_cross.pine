@@ -1,0 +1,146 @@
+//@version=5
+indicator('DEMA13 / EMA13 / EMA21 크로스', shorttitle='D13·E13·E21', overlay=true)
+
+// ══════════════════════════════════════════════════════
+//  설정
+// ══════════════════════════════════════════════════════
+grpMA = '이동평균선 설정'
+src      = input.source(close, '소스', group=grpMA)
+demaLen  = input.int(13, 'DEMA 기간', minval=1, maxval=200, group=grpMA)
+ema1Len  = input.int(13, 'EMA1 기간', minval=1, maxval=200, group=grpMA)
+ema2Len  = input.int(21, 'EMA2 기간', minval=1, maxval=200, group=grpMA)
+colDema  = input.color(#FF6B6B, 'DEMA 색상', group=grpMA)
+colEma1  = input.color(#FFD93D, 'EMA1 색상', group=grpMA)
+colEma2  = input.color(#4D96FF, 'EMA2 색상', group=grpMA)
+lwD      = input.int(2, 'DEMA 굵기',  minval=1, maxval=5, group=grpMA)
+lwE      = input.int(1, 'EMA  굵기',  minval=1, maxval=5, group=grpMA)
+
+grpSig = '신호 설정'
+showDE1 = input.bool(true, 'DEMA x EMA1 크로스 표시', group=grpSig)
+showDE2 = input.bool(true, 'DEMA x EMA2 크로스 표시', group=grpSig)
+showE12 = input.bool(true, 'EMA1 x EMA2 크로스 표시', group=grpSig)
+
+grpTbl  = '테이블 설정'
+tblPos  = input.string('top_right', '위치', options=['top_right','top_left','bottom_right','bottom_left'], group=grpTbl)
+tblSize = input.string('small', '크기', options=['tiny','small','normal','large'], group=grpTbl)
+
+// ══════════════════════════════════════════════════════
+//  헬퍼 함수
+// ══════════════════════════════════════════════════════
+f_pos(p) =>
+    if p == 'top_left'
+        position.top_left
+    else if p == 'bottom_right'
+        position.bottom_right
+    else if p == 'bottom_left'
+        position.bottom_left
+    else
+        position.top_right
+
+f_size(s) =>
+    if s == 'tiny'
+        size.tiny
+    else if s == 'small'
+        size.small
+    else if s == 'large'
+        size.large
+    else
+        size.normal
+
+// ══════════════════════════════════════════════════════
+//  계산
+// ══════════════════════════════════════════════════════
+dema(s, n) =>
+    e = ta.ema(s, n)
+    2.0 * e - ta.ema(e, n)
+
+d13  = dema(src, demaLen)
+e13  = ta.ema(src, ema1Len)
+e21  = ta.ema(src, ema2Len)
+
+// ══════════════════════════════════════════════════════
+//  크로스 감지
+// ══════════════════════════════════════════════════════
+// DEMA13 x EMA13
+gcDE1 = ta.crossover(d13, e13)
+dcDE1 = ta.crossunder(d13, e13)
+
+// DEMA13 x EMA21
+gcDE2 = ta.crossover(d13, e21)
+dcDE2 = ta.crossunder(d13, e21)
+
+// EMA13 x EMA21
+gcE12 = ta.crossover(e13, e21)
+dcE12 = ta.crossunder(e13, e21)
+
+// ══════════════════════════════════════════════════════
+//  라인 표시
+// ══════════════════════════════════════════════════════
+plot(d13, 'DEMA ' + str.tostring(demaLen), color=colDema, linewidth=lwD)
+plot(e13, 'EMA '  + str.tostring(ema1Len), color=colEma1, linewidth=lwE)
+plot(e21, 'EMA '  + str.tostring(ema2Len), color=colEma2, linewidth=lwE)
+
+// ══════════════════════════════════════════════════════
+//  신호 마커
+//  DE1 = DEMA x EMA1  →  삼각형
+//  DE2 = DEMA x EMA2  →  라벨
+//  E12 = EMA1 x EMA2  →  원
+// ══════════════════════════════════════════════════════
+plotshape(showDE1 and gcDE1, title='GC_DE1', style=shape.triangleup,   location=location.belowbar, color=color.lime,   textcolor=color.black, text='D x E1', size=size.small)
+plotshape(showDE1 and dcDE1, title='DC_DE1', style=shape.triangledown, location=location.abovebar, color=color.red,    textcolor=color.white, text='D x E1', size=size.small)
+plotshape(showDE2 and gcDE2, title='GC_DE2', style=shape.labelup,      location=location.belowbar, color=#00BFFF,      textcolor=color.black, text='D x E2', size=size.small)
+plotshape(showDE2 and dcDE2, title='DC_DE2', style=shape.labeldown,    location=location.abovebar, color=#FF6600,      textcolor=color.white, text='D x E2', size=size.small)
+plotshape(showE12 and gcE12, title='GC_E12', style=shape.circle,       location=location.belowbar, color=color.new(color.lime, 10), size=size.small)
+plotshape(showE12 and dcE12, title='DC_E12', style=shape.circle,       location=location.abovebar, color=color.new(color.red,  10), size=size.small)
+
+// ══════════════════════════════════════════════════════
+//  정보 테이블
+// ══════════════════════════════════════════════════════
+var table tbl = table.new(f_pos(tblPos), 3, 6, bgcolor=color.new(color.black, 75), border_width=1, border_color=color.new(color.gray, 55))
+
+if barstate.islast
+    sz  = f_size(tblSize)
+    hBg = color.new(#1A1A2E, 10)
+
+    table.cell(tbl, 0, 0, '지표',   text_color=color.white, text_size=sz, bgcolor=hBg)
+    table.cell(tbl, 1, 0, '현재값', text_color=color.white, text_size=sz, bgcolor=hBg)
+    table.cell(tbl, 2, 0, '크로스', text_color=color.white, text_size=sz, bgcolor=hBg)
+
+    table.cell(tbl, 0, 1, 'DEMA ' + str.tostring(demaLen), text_color=colDema, text_size=sz)
+    table.cell(tbl, 1, 1, str.tostring(d13, '#.00'),        text_color=colDema, text_size=sz)
+    dPos = d13 > e13 and d13 > e21 ? '▲ EMA 위' : d13 < e13 and d13 < e21 ? '▼ EMA 아래' : '↔ 중간'
+    dCol = d13 > e13 and d13 > e21 ? color.lime  : d13 < e13 and d13 < e21 ? color.red    : color.orange
+    table.cell(tbl, 2, 1, dPos, text_color=dCol, text_size=sz)
+
+    table.cell(tbl, 0, 2, 'EMA '  + str.tostring(ema1Len), text_color=colEma1, text_size=sz)
+    table.cell(tbl, 1, 2, str.tostring(e13, '#.00'),        text_color=colEma1, text_size=sz)
+    e1Pos = e13 > d13 ? 'DEMA 위' : 'DEMA 아래'
+    e1Col = e13 > d13 ? color.lime : color.red
+    table.cell(tbl, 2, 2, e1Pos, text_color=e1Col, text_size=sz)
+
+    table.cell(tbl, 0, 3, 'EMA '  + str.tostring(ema2Len), text_color=colEma2, text_size=sz)
+    table.cell(tbl, 1, 3, str.tostring(e21, '#.00'),        text_color=colEma2, text_size=sz)
+    e2Pos = e21 > d13 ? 'DEMA 위' : 'DEMA 아래'
+    e2Col = e21 > d13 ? color.lime : color.red
+    table.cell(tbl, 2, 3, e2Pos, text_color=e2Col, text_size=sz)
+
+    table.cell(tbl, 0, 4, '──', text_color=color.gray, text_size=sz)
+    table.cell(tbl, 1, 4, '──', text_color=color.gray, text_size=sz)
+    table.cell(tbl, 2, 4, '──', text_color=color.gray, text_size=sz)
+
+    // 현재 신호 상태
+    sigTxt = gcDE1 or gcDE2 or gcE12 ? 'GC 신호!' : dcDE1 or dcDE2 or dcE12 ? 'DC 신호!' : '-'
+    sigCol = gcDE1 or gcDE2 or gcE12 ? color.lime  : dcDE1 or dcDE2 or dcE12 ? color.red   : color.gray
+    table.cell(tbl, 0, 5, '신호',  text_color=color.white, text_size=sz, bgcolor=color.new(sigCol, 70))
+    table.cell(tbl, 1, 5, sigTxt, text_color=sigCol, text_size=sz)
+    table.cell(tbl, 2, 5, d13 > e21 ? '▲ 불리시' : '▼ 베어리시', text_color=d13 > e21 ? color.lime : color.red, text_size=sz)
+
+// ══════════════════════════════════════════════════════
+//  알림
+// ══════════════════════════════════════════════════════
+alertcondition(gcDE1, 'DEMA x EMA1 골든크로스', 'DEMA13 x EMA13 골든크로스')
+alertcondition(dcDE1, 'DEMA x EMA1 데드크로스', 'DEMA13 x EMA13 데드크로스')
+alertcondition(gcDE2, 'DEMA x EMA2 골든크로스', 'DEMA13 x EMA21 골든크로스')
+alertcondition(dcDE2, 'DEMA x EMA2 데드크로스', 'DEMA13 x EMA21 데드크로스')
+alertcondition(gcE12, 'EMA1 x EMA2 골든크로스', 'EMA13 x EMA21 골든크로스')
+alertcondition(dcE12, 'EMA1 x EMA2 데드크로스', 'EMA13 x EMA21 데드크로스')
