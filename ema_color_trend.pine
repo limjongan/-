@@ -1,0 +1,177 @@
+//@version=5
+indicator('EMA 추세색 변환', shorttitle='EMA Color', overlay=true)
+
+// ══════════════════════════════════════════════════════
+//  EMA 설정
+// ══════════════════════════════════════════════════════
+grpMA = 'EMA 설정'
+src  = input.source(close, '소스', group=grpMA)
+len1 = input.int(9,   'EMA 1 기간', minval=1, maxval=500, group=grpMA)
+len2 = input.int(25,  'EMA 2 기간', minval=1, maxval=500, group=grpMA)
+len3 = input.int(50,  'EMA 3 기간', minval=1, maxval=500, group=grpMA)
+len4 = input.int(200, 'EMA 4 기간', minval=1, maxval=500, group=grpMA)
+lw1  = input.int(2, 'EMA1·2 굵기', minval=1, maxval=5, group=grpMA)
+lw2  = input.int(3, 'EMA3·4 굵기', minval=1, maxval=5, group=grpMA)
+
+// ══════════════════════════════════════════════════════
+//  색상 설정
+// ══════════════════════════════════════════════════════
+grpCol = '색상 설정'
+upCol1  = input.color(#00E676, 'EMA1 상승 색', group=grpCol)
+dnCol1  = input.color(#FF1744, 'EMA1 하락 색', group=grpCol)
+upCol2  = input.color(#69F0AE, 'EMA2 상승 색', group=grpCol)
+dnCol2  = input.color(#FF6D00, 'EMA2 하락 색', group=grpCol)
+upCol3  = input.color(#40C4FF, 'EMA3 상승 색', group=grpCol)
+dnCol3  = input.color(#E040FB, 'EMA3 하락 색', group=grpCol)
+upCol4  = input.color(#FFD740, 'EMA4 상승 색', group=grpCol)
+dnCol4  = input.color(#78909C, 'EMA4 하락 색', group=grpCol)
+
+// ══════════════════════════════════════════════════════
+//  신호 · 테이블 설정
+// ══════════════════════════════════════════════════════
+grpSig  = '신호 설정'
+showSig = input.bool(true, '크로스 신호 표시', group=grpSig)
+showBg  = input.bool(true, 'EMA1 기준 배경색', group=grpSig)
+
+grpTbl  = '테이블 설정'
+tblPos  = input.string('top_right', '위치', options=['top_right','top_left','bottom_right','bottom_left'], group=grpTbl)
+tblSize = input.string('small', '크기', options=['tiny','small','normal','large'], group=grpTbl)
+
+// ══════════════════════════════════════════════════════
+//  헬퍼 함수
+// ══════════════════════════════════════════════════════
+f_pos(p) =>
+    if p == 'top_left'
+        position.top_left
+    else if p == 'bottom_right'
+        position.bottom_right
+    else if p == 'bottom_left'
+        position.bottom_left
+    else
+        position.top_right
+
+f_size(s) =>
+    if s == 'tiny'
+        size.tiny
+    else if s == 'small'
+        size.small
+    else if s == 'large'
+        size.large
+    else
+        size.normal
+
+// ══════════════════════════════════════════════════════
+//  EMA 계산
+// ══════════════════════════════════════════════════════
+e1 = ta.ema(src, len1)
+e2 = ta.ema(src, len2)
+e3 = ta.ema(src, len3)
+e4 = ta.ema(src, len4)
+
+// ══════════════════════════════════════════════════════
+//  기울기 방향 판단 (현재 > 이전 = 상승)
+// ══════════════════════════════════════════════════════
+up1 = e1 > e1[1]
+up2 = e2 > e2[1]
+up3 = e3 > e3[1]
+up4 = e4 > e4[1]
+
+// ══════════════════════════════════════════════════════
+//  추세변환 감지 (기울기 방향 전환)
+// ══════════════════════════════════════════════════════
+flip1Up   = up1 and not up1[1]
+flip1Down = not up1 and up1[1]
+flip2Up   = up2 and not up2[1]
+flip2Down = not up2 and up2[1]
+flip3Up   = up3 and not up3[1]
+flip3Down = not up3 and up3[1]
+flip4Up   = up4 and not up4[1]
+flip4Down = not up4 and up4[1]
+
+// ══════════════════════════════════════════════════════
+//  EMA 라인 (색상이 기울기에 따라 실시간 변환)
+// ══════════════════════════════════════════════════════
+plot(e1, 'EMA1', color=up1 ? upCol1 : dnCol1, linewidth=lw1)
+plot(e2, 'EMA2', color=up2 ? upCol2 : dnCol2, linewidth=lw1)
+plot(e3, 'EMA3', color=up3 ? upCol3 : dnCol3, linewidth=lw2)
+plot(e4, 'EMA4', color=up4 ? upCol4 : dnCol4, linewidth=lw2)
+
+// ══════════════════════════════════════════════════════
+//  배경색 (EMA1 방향 기준)
+// ══════════════════════════════════════════════════════
+bgCol = showBg and up1 ? color.new(color.lime, 95) : showBg and not up1 ? color.new(color.red, 95) : na
+bgcolor(bgCol, title='EMA1 방향 배경')
+
+// ══════════════════════════════════════════════════════
+//  추세변환 신호 표시
+// ══════════════════════════════════════════════════════
+plotshape(showSig and flip1Up,   title='F1U', style=shape.triangleup,   location=location.belowbar, color=upCol1, size=size.tiny)
+plotshape(showSig and flip1Down, title='F1D', style=shape.triangledown, location=location.abovebar, color=dnCol1, size=size.tiny)
+plotshape(showSig and flip2Up,   title='F2U', style=shape.triangleup,   location=location.belowbar, color=upCol2, size=size.tiny)
+plotshape(showSig and flip2Down, title='F2D', style=shape.triangledown, location=location.abovebar, color=dnCol2, size=size.tiny)
+plotshape(showSig and flip3Up,   title='F3U', style=shape.labelup,      location=location.belowbar, color=upCol3, textcolor=color.black, text='3', size=size.tiny)
+plotshape(showSig and flip3Down, title='F3D', style=shape.labeldown,    location=location.abovebar, color=dnCol3, textcolor=color.white, text='3', size=size.tiny)
+plotshape(showSig and flip4Up,   title='F4U', style=shape.flag,         location=location.belowbar, color=upCol4, textcolor=color.black, text='4', size=size.small)
+plotshape(showSig and flip4Down, title='F4D', style=shape.flag,         location=location.abovebar, color=dnCol4, textcolor=color.white, text='4', size=size.small)
+
+// ══════════════════════════════════════════════════════
+//  정렬 상태
+// ══════════════════════════════════════════════════════
+c1 = close > e1
+c2 = e1 > e2
+c3 = e2 > e3
+c4 = e3 > e4
+bullCnt = (c1 ? 1 : 0) + (c2 ? 1 : 0) + (c3 ? 1 : 0) + (c4 ? 1 : 0)
+alignTxt = bullCnt == 4 ? '완전 정배열' : bullCnt == 3 ? '부분 정배열' : bullCnt == 0 ? '완전 역배열' : bullCnt == 1 ? '부분 역배열' : '혼재'
+alignCol = bullCnt == 4 ? color.lime : bullCnt == 3 ? #6BCB77 : bullCnt == 0 ? color.red : bullCnt == 1 ? color.orange : color.gray
+
+// ══════════════════════════════════════════════════════
+//  정보 테이블
+// ══════════════════════════════════════════════════════
+var table tbl = table.new(f_pos(tblPos), 3, 7, bgcolor=color.new(color.black, 75), border_width=1, border_color=color.new(color.gray, 55))
+
+if barstate.islast
+    sz  = f_size(tblSize)
+    hBg = color.new(#1A1A2E, 10)
+    table.cell(tbl, 0, 0, 'EMA',    text_color=color.white, text_size=sz, bgcolor=hBg)
+    table.cell(tbl, 1, 0, '현재값', text_color=color.white, text_size=sz, bgcolor=hBg)
+    table.cell(tbl, 2, 0, '방향',   text_color=color.white, text_size=sz, bgcolor=hBg)
+
+    e1c = up1 ? upCol1 : dnCol1
+    e2c = up2 ? upCol2 : dnCol2
+    e3c = up3 ? upCol3 : dnCol3
+    e4c = up4 ? upCol4 : dnCol4
+
+    table.cell(tbl, 0, 1, 'EMA ' + str.tostring(len1), text_color=e1c, text_size=sz)
+    table.cell(tbl, 1, 1, str.tostring(e1, '#.00'), text_color=e1c, text_size=sz)
+    table.cell(tbl, 2, 1, up1 ? '▲ 상승중' : '▼ 하락중', text_color=e1c, text_size=sz, bgcolor=color.new(e1c, 80))
+
+    table.cell(tbl, 0, 2, 'EMA ' + str.tostring(len2), text_color=e2c, text_size=sz)
+    table.cell(tbl, 1, 2, str.tostring(e2, '#.00'), text_color=e2c, text_size=sz)
+    table.cell(tbl, 2, 2, up2 ? '▲ 상승중' : '▼ 하락중', text_color=e2c, text_size=sz, bgcolor=color.new(e2c, 80))
+
+    table.cell(tbl, 0, 3, 'EMA ' + str.tostring(len3), text_color=e3c, text_size=sz)
+    table.cell(tbl, 1, 3, str.tostring(e3, '#.00'), text_color=e3c, text_size=sz)
+    table.cell(tbl, 2, 3, up3 ? '▲ 상승중' : '▼ 하락중', text_color=e3c, text_size=sz, bgcolor=color.new(e3c, 80))
+
+    table.cell(tbl, 0, 4, 'EMA ' + str.tostring(len4), text_color=e4c, text_size=sz)
+    table.cell(tbl, 1, 4, str.tostring(e4, '#.00'), text_color=e4c, text_size=sz)
+    table.cell(tbl, 2, 4, up4 ? '▲ 상승중' : '▼ 하락중', text_color=e4c, text_size=sz, bgcolor=color.new(e4c, 80))
+
+    table.cell(tbl, 0, 5, '──', text_color=color.gray, text_size=sz)
+    table.cell(tbl, 1, 5, '──', text_color=color.gray, text_size=sz)
+    table.cell(tbl, 2, 5, '──', text_color=color.gray, text_size=sz)
+
+    table.cell(tbl, 0, 6, '배열',   text_color=color.white, text_size=sz, bgcolor=color.new(alignCol, 60))
+    table.cell(tbl, 1, 6, alignTxt, text_color=alignCol, text_size=sz)
+    table.cell(tbl, 2, 6, str.tostring(bullCnt) + ' / 4', text_color=color.white, text_size=sz)
+
+// ══════════════════════════════════════════════════════
+//  알림
+// ══════════════════════════════════════════════════════
+alertcondition(flip1Up,   'EMA1 상승전환', 'EMA1 방향 상승 전환')
+alertcondition(flip1Down, 'EMA1 하락전환', 'EMA1 방향 하락 전환')
+alertcondition(flip3Up,   'EMA3 상승전환', 'EMA3 방향 상승 전환')
+alertcondition(flip3Down, 'EMA3 하락전환', 'EMA3 방향 하락 전환')
+alertcondition(flip4Up,   'EMA4 상승전환 (강한신호)', 'EMA4 방향 상승 전환')
+alertcondition(flip4Down, 'EMA4 하락전환 (강한신호)', 'EMA4 방향 하락 전환')
