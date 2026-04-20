@@ -2,7 +2,7 @@
 indicator('EMA 추세변환 신호', shorttitle='EMA Flip', overlay=true)
 
 // ══════════════════════════════════════════════════════
-//  EMA 설정
+//  설정
 // ══════════════════════════════════════════════════════
 grpMA = 'EMA 설정'
 src   = input.source(close, '소스', group=grpMA)
@@ -17,9 +17,6 @@ col4  = input.color(#4D96FF, 'EMA 4 색상', group=grpMA)
 lw1   = input.int(1, 'EMA1·2 굵기', minval=1, maxval=4, group=grpMA)
 lw2   = input.int(2, 'EMA3·4 굵기', minval=1, maxval=4, group=grpMA)
 
-// ══════════════════════════════════════════════════════
-//  신호 설정
-// ══════════════════════════════════════════════════════
 grpSig = '신호 설정'
 show12 = input.bool(true, 'EMA1 x EMA2 크로스 표시', group=grpSig)
 show23 = input.bool(true, 'EMA2 x EMA3 크로스 표시', group=grpSig)
@@ -27,9 +24,6 @@ show34 = input.bool(true, 'EMA3 x EMA4 크로스 표시', group=grpSig)
 showPC = input.bool(true, '가격 x EMA1 크로스 표시', group=grpSig)
 showBg = input.bool(true, 'EMA1·EMA2 기준 배경색',   group=grpSig)
 
-// ══════════════════════════════════════════════════════
-//  테이블 설정
-// ══════════════════════════════════════════════════════
 grpTbl  = '테이블 설정'
 tblPos  = input.string('top_right', '위치', options=['top_right','top_left','bottom_right','bottom_left'], group=grpTbl)
 tblSize = input.string('small', '크기', options=['tiny','small','normal','large'], group=grpTbl)
@@ -66,7 +60,7 @@ e3 = ta.ema(src, len3)
 e4 = ta.ema(src, len4)
 
 // ══════════════════════════════════════════════════════
-//  추세변환 감지
+//  크로스 감지
 // ══════════════════════════════════════════════════════
 gc12 = ta.crossover(e1, e2)
 dc12 = ta.crossunder(e1, e2)
@@ -78,7 +72,7 @@ gcP1 = ta.crossover(src, e1)
 dcP1 = ta.crossunder(src, e1)
 
 // ══════════════════════════════════════════════════════
-//  EMA 라인 표시
+//  EMA 라인
 // ══════════════════════════════════════════════════════
 plot(e1, 'EMA1', color=col1, linewidth=lw1)
 plot(e2, 'EMA2', color=col2, linewidth=lw1)
@@ -86,11 +80,10 @@ plot(e3, 'EMA3', color=col3, linewidth=lw2)
 plot(e4, 'EMA4', color=col4, linewidth=lw2)
 
 // ══════════════════════════════════════════════════════
-//  배경색
+//  배경색 — 변수로 분리하여 한 줄 오류 방지
 // ══════════════════════════════════════════════════════
-bgcolor(showBg and e1 > e2 ? color.new(color.lime, 95) :
-        showBg and e1 < e2 ? color.new(color.red,  95) : na,
-        title='EMA1·2 배경')
+bgColor = showBg and e1 > e2 ? color.new(color.lime, 95) : showBg and e1 < e2 ? color.new(color.red, 95) : na
+bgcolor(bgColor, title='EMA 배경')
 
 // ══════════════════════════════════════════════════════
 //  신호 화살표
@@ -105,56 +98,45 @@ plotshape(showPC and gcP1, title='GCP1', style=shape.circle,       location=loca
 plotshape(showPC and dcP1, title='DCP1', style=shape.circle,       location=location.abovebar, color=color.new(color.red,  20), size=size.tiny)
 
 // ══════════════════════════════════════════════════════
-//  정렬 상태
+//  정렬 상태 — 변수로 분리
 // ══════════════════════════════════════════════════════
 c1 = close > e1
-c2 = e1    > e2
-c3 = e2    > e3
-c4 = e3    > e4
+c2 = e1 > e2
+c3 = e2 > e3
+c4 = e3 > e4
 bullCnt = (c1 ? 1 : 0) + (c2 ? 1 : 0) + (c3 ? 1 : 0) + (c4 ? 1 : 0)
 
-alignTxt = bullCnt == 4 ? '완전 정배열' : bullCnt == 3 ? '부분 정배열' :
-           bullCnt == 0 ? '완전 역배열' : bullCnt == 1 ? '부분 역배열' : '혼재'
-alignCol = bullCnt == 4 ? color.lime    : bullCnt == 3 ? #6BCB77 :
-           bullCnt == 0 ? color.red     : bullCnt == 1 ? color.orange : color.gray
+alignTxt = bullCnt == 4 ? '완전 정배열' : bullCnt == 3 ? '부분 정배열' : bullCnt == 0 ? '완전 역배열' : bullCnt == 1 ? '부분 역배열' : '혼재'
+alignCol = bullCnt == 4 ? color.lime : bullCnt == 3 ? #6BCB77 : bullCnt == 0 ? color.red : bullCnt == 1 ? color.orange : color.gray
 
 // ══════════════════════════════════════════════════════
 //  정보 테이블
 // ══════════════════════════════════════════════════════
-var table tbl = table.new(f_pos(tblPos), 3, 7,
-     bgcolor=color.new(color.black, 75),
-     border_width=1, border_color=color.new(color.gray, 55))
+var table tbl = table.new(f_pos(tblPos), 3, 7, bgcolor=color.new(color.black, 75), border_width=1, border_color=color.new(color.gray, 55))
 
 if barstate.islast
     sz  = f_size(tblSize)
     hBg = color.new(#1A1A2E, 10)
-
     table.cell(tbl, 0, 0, 'EMA',    text_color=color.white, text_size=sz, bgcolor=hBg)
     table.cell(tbl, 1, 0, '현재값', text_color=color.white, text_size=sz, bgcolor=hBg)
     table.cell(tbl, 2, 0, '위치',   text_color=color.white, text_size=sz, bgcolor=hBg)
-
     table.cell(tbl, 0, 1, 'EMA ' + str.tostring(len1), text_color=col1, text_size=sz)
-    table.cell(tbl, 1, 1, str.tostring(e1, '#.00'),    text_color=col1, text_size=sz)
+    table.cell(tbl, 1, 1, str.tostring(e1, '#.00'), text_color=col1, text_size=sz)
     table.cell(tbl, 2, 1, c1 ? '▲ 가격위' : '▼ 가격아래', text_color=c1 ? color.lime : color.red, text_size=sz)
-
     table.cell(tbl, 0, 2, 'EMA ' + str.tostring(len2), text_color=col2, text_size=sz)
-    table.cell(tbl, 1, 2, str.tostring(e2, '#.00'),    text_color=col2, text_size=sz)
+    table.cell(tbl, 1, 2, str.tostring(e2, '#.00'), text_color=col2, text_size=sz)
     table.cell(tbl, 2, 2, c2 ? '▲ EMA1위' : '▼ EMA1아래', text_color=c2 ? color.lime : color.red, text_size=sz)
-
     table.cell(tbl, 0, 3, 'EMA ' + str.tostring(len3), text_color=col3, text_size=sz)
-    table.cell(tbl, 1, 3, str.tostring(e3, '#.00'),    text_color=col3, text_size=sz)
+    table.cell(tbl, 1, 3, str.tostring(e3, '#.00'), text_color=col3, text_size=sz)
     table.cell(tbl, 2, 3, c3 ? '▲ EMA2위' : '▼ EMA2아래', text_color=c3 ? color.lime : color.red, text_size=sz)
-
     table.cell(tbl, 0, 4, 'EMA ' + str.tostring(len4), text_color=col4, text_size=sz)
-    table.cell(tbl, 1, 4, str.tostring(e4, '#.00'),    text_color=col4, text_size=sz)
+    table.cell(tbl, 1, 4, str.tostring(e4, '#.00'), text_color=col4, text_size=sz)
     table.cell(tbl, 2, 4, c4 ? '▲ EMA3위' : '▼ EMA3아래', text_color=c4 ? color.lime : color.red, text_size=sz)
-
     table.cell(tbl, 0, 5, '──', text_color=color.gray, text_size=sz)
     table.cell(tbl, 1, 5, '──', text_color=color.gray, text_size=sz)
     table.cell(tbl, 2, 5, '──', text_color=color.gray, text_size=sz)
-
     table.cell(tbl, 0, 6, '배열',   text_color=color.white, text_size=sz, bgcolor=color.new(alignCol, 60))
-    table.cell(tbl, 1, 6, alignTxt, text_color=alignCol,    text_size=sz)
+    table.cell(tbl, 1, 6, alignTxt, text_color=alignCol, text_size=sz)
     table.cell(tbl, 2, 6, str.tostring(bullCnt) + ' / 4', text_color=color.white, text_size=sz)
 
 // ══════════════════════════════════════════════════════
@@ -164,5 +146,5 @@ alertcondition(gc12, 'EMA1x2 골든크로스', 'EMA1 x EMA2 골든크로스')
 alertcondition(dc12, 'EMA1x2 데드크로스', 'EMA1 x EMA2 데드크로스')
 alertcondition(gc23, 'EMA2x3 골든크로스', 'EMA2 x EMA3 골든크로스')
 alertcondition(dc23, 'EMA2x3 데드크로스', 'EMA2 x EMA3 데드크로스')
-alertcondition(gc34, 'EMA3x4 골든크로스 (강한신호)', 'EMA3 x EMA4 골든크로스')
-alertcondition(dc34, 'EMA3x4 데드크로스 (강한신호)', 'EMA3 x EMA4 데드크로스')
+alertcondition(gc34, 'EMA3x4 골든크로스 강한신호', 'EMA3 x EMA4 골든크로스')
+alertcondition(dc34, 'EMA3x4 데드크로스 강한신호', 'EMA3 x EMA4 데드크로스')
