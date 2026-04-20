@@ -69,19 +69,12 @@ e4 = ta.ema(src, len4)
 // ══════════════════════════════════════════════════════
 //  추세변환 감지
 // ══════════════════════════════════════════════════════
-// EMA1 × EMA2 (빠른 신호)
 gc12 = ta.crossover(e1, e2)
 dc12 = ta.crossunder(e1, e2)
-
-// EMA2 × EMA3 (중간 신호)
 gc23 = ta.crossover(e2, e3)
 dc23 = ta.crossunder(e2, e3)
-
-// EMA3 × EMA4 (느린 신호 — 강한 추세변환)
 gc34 = ta.crossover(e3, e4)
 dc34 = ta.crossunder(e3, e4)
-
-// 가격 × EMA1 (진입 신호)
 gcP1 = ta.crossover(src, e1)
 dcP1 = ta.crossunder(src, e1)
 
@@ -101,47 +94,47 @@ bgcolor(showBg and e1 > e2 ? color.new(color.lime, 95) :
         title='EMA1·2 추세 배경')
 
 // ══════════════════════════════════════════════════════
-//  신호 화살표 — Pine Script const string 제약으로 분리
+//  신호 화살표 — title 고유값 필수 (Pine Script 제약)
 // ══════════════════════════════════════════════════════
-// ── EMA1 × EMA2
-plotshape(show12 and gc12 and sigSz=='tiny',   'GC12', shape.triangleup,   location.belowbar, color.new(color.lime,0),  text='1×2↑', textcolor=color.black, size=size.tiny)
-plotshape(show12 and gc12 and sigSz=='small',  'GC12', shape.triangleup,   location.belowbar, color.new(color.lime,0),  text='1×2↑', textcolor=color.black, size=size.small)
-plotshape(show12 and gc12 and sigSz=='normal', 'GC12', shape.triangleup,   location.belowbar, color.new(color.lime,0),  text='1×2↑', textcolor=color.black, size=size.normal)
-plotshape(show12 and gc12 and sigSz=='large',  'GC12', shape.triangleup,   location.belowbar, color.new(color.lime,0),  text='1×2↑', textcolor=color.black, size=size.large)
-plotshape(show12 and dc12 and sigSz=='tiny',   'DC12', shape.triangledown, location.abovebar, color.new(color.red,0),   text='1×2↓', textcolor=color.white, size=size.tiny)
-plotshape(show12 and dc12 and sigSz=='small',  'DC12', shape.triangledown, location.abovebar, color.new(color.red,0),   text='1×2↓', textcolor=color.white, size=size.small)
-plotshape(show12 and dc12 and sigSz=='normal', 'DC12', shape.triangledown, location.abovebar, color.new(color.red,0),   text='1×2↓', textcolor=color.white, size=size.normal)
-plotshape(show12 and dc12 and sigSz=='large',  'DC12', shape.triangledown, location.abovebar, color.new(color.red,0),   text='1×2↓', textcolor=color.white, size=size.large)
+// ── EMA1 × EMA2 골든/데드크로스
+plotshape(show12 and gc12 and sigSz=='tiny',   title='GC12_T', style=shape.triangleup,   location=location.belowbar, color=color.new(color.lime,0), text='1×2↑', textcolor=color.black, size=size.tiny)
+plotshape(show12 and gc12 and sigSz=='small',  title='GC12_S', style=shape.triangleup,   location=location.belowbar, color=color.new(color.lime,0), text='1×2↑', textcolor=color.black, size=size.small)
+plotshape(show12 and gc12 and sigSz=='normal', title='GC12_N', style=shape.triangleup,   location=location.belowbar, color=color.new(color.lime,0), text='1×2↑', textcolor=color.black, size=size.normal)
+plotshape(show12 and gc12 and sigSz=='large',  title='GC12_L', style=shape.triangleup,   location=location.belowbar, color=color.new(color.lime,0), text='1×2↑', textcolor=color.black, size=size.large)
+plotshape(show12 and dc12 and sigSz=='tiny',   title='DC12_T', style=shape.triangledown, location=location.abovebar, color=color.new(color.red,0),  text='1×2↓', textcolor=color.white, size=size.tiny)
+plotshape(show12 and dc12 and sigSz=='small',  title='DC12_S', style=shape.triangledown, location=location.abovebar, color=color.new(color.red,0),  text='1×2↓', textcolor=color.white, size=size.small)
+plotshape(show12 and dc12 and sigSz=='normal', title='DC12_N', style=shape.triangledown, location=location.abovebar, color=color.new(color.red,0),  text='1×2↓', textcolor=color.white, size=size.normal)
+plotshape(show12 and dc12 and sigSz=='large',  title='DC12_L', style=shape.triangledown, location=location.abovebar, color=color.new(color.red,0),  text='1×2↓', textcolor=color.white, size=size.large)
 
-// ── EMA2 × EMA3
-plotshape(show23 and gc23 and sigSz=='tiny',   'GC23', shape.labelup,   location.belowbar, color.new(#00BFFF,0), textcolor=color.black, text='2×3↑', size=size.tiny)
-plotshape(show23 and gc23 and sigSz=='small',  'GC23', shape.labelup,   location.belowbar, color.new(#00BFFF,0), textcolor=color.black, text='2×3↑', size=size.small)
-plotshape(show23 and gc23 and sigSz=='normal', 'GC23', shape.labelup,   location.belowbar, color.new(#00BFFF,0), textcolor=color.black, text='2×3↑', size=size.normal)
-plotshape(show23 and gc23 and sigSz=='large',  'GC23', shape.labelup,   location.belowbar, color.new(#00BFFF,0), textcolor=color.black, text='2×3↑', size=size.large)
-plotshape(show23 and dc23 and sigSz=='tiny',   'DC23', shape.labeldown, location.abovebar, color.new(#FF6600,0), textcolor=color.white, text='2×3↓', size=size.tiny)
-plotshape(show23 and dc23 and sigSz=='small',  'DC23', shape.labeldown, location.abovebar, color.new(#FF6600,0), textcolor=color.white, text='2×3↓', size=size.small)
-plotshape(show23 and dc23 and sigSz=='normal', 'DC23', shape.labeldown, location.abovebar, color.new(#FF6600,0), textcolor=color.white, text='2×3↓', size=size.normal)
-plotshape(show23 and dc23 and sigSz=='large',  'DC23', shape.labeldown, location.abovebar, color.new(#FF6600,0), textcolor=color.white, text='2×3↓', size=size.large)
+// ── EMA2 × EMA3 골든/데드크로스
+plotshape(show23 and gc23 and sigSz=='tiny',   title='GC23_T', style=shape.labelup,   location=location.belowbar, color=color.new(#00BFFF,0), text='2×3↑', textcolor=color.black, size=size.tiny)
+plotshape(show23 and gc23 and sigSz=='small',  title='GC23_S', style=shape.labelup,   location=location.belowbar, color=color.new(#00BFFF,0), text='2×3↑', textcolor=color.black, size=size.small)
+plotshape(show23 and gc23 and sigSz=='normal', title='GC23_N', style=shape.labelup,   location=location.belowbar, color=color.new(#00BFFF,0), text='2×3↑', textcolor=color.black, size=size.normal)
+plotshape(show23 and gc23 and sigSz=='large',  title='GC23_L', style=shape.labelup,   location=location.belowbar, color=color.new(#00BFFF,0), text='2×3↑', textcolor=color.black, size=size.large)
+plotshape(show23 and dc23 and sigSz=='tiny',   title='DC23_T', style=shape.labeldown, location=location.abovebar, color=color.new(#FF6600,0), text='2×3↓', textcolor=color.white, size=size.tiny)
+plotshape(show23 and dc23 and sigSz=='small',  title='DC23_S', style=shape.labeldown, location=location.abovebar, color=color.new(#FF6600,0), text='2×3↓', textcolor=color.white, size=size.small)
+plotshape(show23 and dc23 and sigSz=='normal', title='DC23_N', style=shape.labeldown, location=location.abovebar, color=color.new(#FF6600,0), text='2×3↓', textcolor=color.white, size=size.normal)
+plotshape(show23 and dc23 and sigSz=='large',  title='DC23_L', style=shape.labeldown, location=location.abovebar, color=color.new(#FF6600,0), text='2×3↓', textcolor=color.white, size=size.large)
 
-// ── EMA3 × EMA4 (가장 강한 신호 — 큰 별 모양)
-plotshape(show34 and gc34 and sigSz=='tiny',   'GC34', shape.flag,     location.belowbar, color.new(color.yellow,0), textcolor=color.black, text='3×4↑', size=size.tiny)
-plotshape(show34 and gc34 and sigSz=='small',  'GC34', shape.flag,     location.belowbar, color.new(color.yellow,0), textcolor=color.black, text='3×4↑', size=size.small)
-plotshape(show34 and gc34 and sigSz=='normal', 'GC34', shape.flag,     location.belowbar, color.new(color.yellow,0), textcolor=color.black, text='3×4↑', size=size.normal)
-plotshape(show34 and gc34 and sigSz=='large',  'GC34', shape.flag,     location.belowbar, color.new(color.yellow,0), textcolor=color.black, text='3×4↑', size=size.large)
-plotshape(show34 and dc34 and sigSz=='tiny',   'DC34', shape.flag,     location.abovebar, color.new(color.purple,0), textcolor=color.white, text='3×4↓', size=size.tiny)
-plotshape(show34 and dc34 and sigSz=='small',  'DC34', shape.flag,     location.abovebar, color.new(color.purple,0), textcolor=color.white, text='3×4↓', size=size.small)
-plotshape(show34 and dc34 and sigSz=='normal', 'DC34', shape.flag,     location.abovebar, color.new(color.purple,0), textcolor=color.white, text='3×4↓', size=size.normal)
-plotshape(show34 and dc34 and sigSz=='large',  'DC34', shape.flag,     location.abovebar, color.new(color.purple,0), textcolor=color.white, text='3×4↓', size=size.large)
+// ── EMA3 × EMA4 골든/데드크로스 (강한 신호)
+plotshape(show34 and gc34 and sigSz=='tiny',   title='GC34_T', style=shape.flag, location=location.belowbar, color=color.new(color.yellow,0), text='3×4↑', textcolor=color.black, size=size.tiny)
+plotshape(show34 and gc34 and sigSz=='small',  title='GC34_S', style=shape.flag, location=location.belowbar, color=color.new(color.yellow,0), text='3×4↑', textcolor=color.black, size=size.small)
+plotshape(show34 and gc34 and sigSz=='normal', title='GC34_N', style=shape.flag, location=location.belowbar, color=color.new(color.yellow,0), text='3×4↑', textcolor=color.black, size=size.normal)
+plotshape(show34 and gc34 and sigSz=='large',  title='GC34_L', style=shape.flag, location=location.belowbar, color=color.new(color.yellow,0), text='3×4↑', textcolor=color.black, size=size.large)
+plotshape(show34 and dc34 and sigSz=='tiny',   title='DC34_T', style=shape.flag, location=location.abovebar, color=color.new(color.purple,0), text='3×4↓', textcolor=color.white, size=size.tiny)
+plotshape(show34 and dc34 and sigSz=='small',  title='DC34_S', style=shape.flag, location=location.abovebar, color=color.new(color.purple,0), text='3×4↓', textcolor=color.white, size=size.small)
+plotshape(show34 and dc34 and sigSz=='normal', title='DC34_N', style=shape.flag, location=location.abovebar, color=color.new(color.purple,0), text='3×4↓', textcolor=color.white, size=size.normal)
+plotshape(show34 and dc34 and sigSz=='large',  title='DC34_L', style=shape.flag, location=location.abovebar, color=color.new(color.purple,0), text='3×4↓', textcolor=color.white, size=size.large)
 
-// ── 가격 × EMA1 (점 신호)
-plotshape(showPC and gcP1 and sigSz=='tiny',   'GCP1', shape.circle, location.belowbar, color.new(color.lime,20), size=size.tiny)
-plotshape(showPC and gcP1 and sigSz=='small',  'GCP1', shape.circle, location.belowbar, color.new(color.lime,20), size=size.small)
-plotshape(showPC and gcP1 and sigSz=='normal', 'GCP1', shape.circle, location.belowbar, color.new(color.lime,20), size=size.normal)
-plotshape(showPC and gcP1 and sigSz=='large',  'GCP1', shape.circle, location.belowbar, color.new(color.lime,20), size=size.large)
-plotshape(showPC and dcP1 and sigSz=='tiny',   'DCP1', shape.circle, location.abovebar, color.new(color.red,20),  size=size.tiny)
-plotshape(showPC and dcP1 and sigSz=='small',  'DCP1', shape.circle, location.abovebar, color.new(color.red,20),  size=size.small)
-plotshape(showPC and dcP1 and sigSz=='normal', 'DCP1', shape.circle, location.abovebar, color.new(color.red,20),  size=size.normal)
-plotshape(showPC and dcP1 and sigSz=='large',  'DCP1', shape.circle, location.abovebar, color.new(color.red,20),  size=size.large)
+// ── 가격 × EMA1 크로스 (점)
+plotshape(showPC and gcP1 and sigSz=='tiny',   title='GCP1_T', style=shape.circle, location=location.belowbar, color=color.new(color.lime,20), size=size.tiny)
+plotshape(showPC and gcP1 and sigSz=='small',  title='GCP1_S', style=shape.circle, location=location.belowbar, color=color.new(color.lime,20), size=size.small)
+plotshape(showPC and gcP1 and sigSz=='normal', title='GCP1_N', style=shape.circle, location=location.belowbar, color=color.new(color.lime,20), size=size.normal)
+plotshape(showPC and gcP1 and sigSz=='large',  title='GCP1_L', style=shape.circle, location=location.belowbar, color=color.new(color.lime,20), size=size.large)
+plotshape(showPC and dcP1 and sigSz=='tiny',   title='DCP1_T', style=shape.circle, location=location.abovebar, color=color.new(color.red,20),  size=size.tiny)
+plotshape(showPC and dcP1 and sigSz=='small',  title='DCP1_S', style=shape.circle, location=location.abovebar, color=color.new(color.red,20),  size=size.small)
+plotshape(showPC and dcP1 and sigSz=='normal', title='DCP1_N', style=shape.circle, location=location.abovebar, color=color.new(color.red,20),  size=size.normal)
+plotshape(showPC and dcP1 and sigSz=='large',  title='DCP1_L', style=shape.circle, location=location.abovebar, color=color.new(color.red,20),  size=size.large)
 
 // ══════════════════════════════════════════════════════
 //  정렬 상태 계산
@@ -192,16 +185,16 @@ if barstate.islast
     table.cell(tbl, 1, 5, '──', text_color=color.gray, text_size=sz)
     table.cell(tbl, 2, 5, '──', text_color=color.gray, text_size=sz)
 
-    table.cell(tbl, 0, 6, '배열',     text_color=color.white, text_size=sz, bgcolor=color.new(alignCol, 60))
-    table.cell(tbl, 1, 6, alignTxt,   text_color=alignCol,    text_size=sz)
+    table.cell(tbl, 0, 6, '배열',   text_color=color.white, text_size=sz, bgcolor=color.new(alignCol, 60))
+    table.cell(tbl, 1, 6, alignTxt, text_color=alignCol,    text_size=sz)
     table.cell(tbl, 2, 6, str.tostring(bullCnt)+' / 4', text_color=color.white, text_size=sz)
 
 // ══════════════════════════════════════════════════════
 //  알림
 // ══════════════════════════════════════════════════════
-alertcondition(gc12, '📈 EMA1×2 골든크로스', 'EMA' + str.tostring(len1) + ' × EMA' + str.tostring(len2) + ' 골든크로스')
-alertcondition(dc12, '📉 EMA1×2 데드크로스', 'EMA' + str.tostring(len1) + ' × EMA' + str.tostring(len2) + ' 데드크로스')
-alertcondition(gc23, '📈 EMA2×3 골든크로스', 'EMA' + str.tostring(len2) + ' × EMA' + str.tostring(len3) + ' 골든크로스')
-alertcondition(dc23, '📉 EMA2×3 데드크로스', 'EMA' + str.tostring(len2) + ' × EMA' + str.tostring(len3) + ' 데드크로스')
-alertcondition(gc34, '🚀 EMA3×4 골든크로스 (강한신호)', 'EMA' + str.tostring(len3) + ' × EMA' + str.tostring(len4) + ' 골든크로스 — 강한 추세변환')
-alertcondition(dc34, '💥 EMA3×4 데드크로스 (강한신호)', 'EMA' + str.tostring(len3) + ' × EMA' + str.tostring(len4) + ' 데드크로스 — 강한 추세변환')
+alertcondition(gc12, '📈 EMA1×2 골든크로스', 'EMA1×EMA2 골든크로스')
+alertcondition(dc12, '📉 EMA1×2 데드크로스', 'EMA1×EMA2 데드크로스')
+alertcondition(gc23, '📈 EMA2×3 골든크로스', 'EMA2×EMA3 골든크로스')
+alertcondition(dc23, '📉 EMA2×3 데드크로스', 'EMA2×EMA3 데드크로스')
+alertcondition(gc34, '🚀 EMA3×4 골든크로스 (강한신호)', 'EMA3×EMA4 골든크로스')
+alertcondition(dc34, '💥 EMA3×4 데드크로스 (강한신호)', 'EMA3×EMA4 데드크로스')
