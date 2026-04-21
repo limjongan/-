@@ -94,6 +94,19 @@ var float t1 = 0.0, var float t2 = 0.0, var float t3 = 0.0, var float t4 = 0.0, 
 var bool  t1Hit = false, var bool t2Hit = false, var bool t3Hit = false, var bool t4Hit = false, var bool t5Hit = false
 var bool  beMoved = false
 
+// 라인 & 레이블 (SL 감지에서도 사용하므로 상단에 선언)
+color c_tq = #40E0D0
+var line lE = na, var line lSL = na
+var line lT1 = na, var line lT2 = na, var line lT3 = na, var line lT4 = na, var line lT5 = na
+
+var label lbE  = label.new(na, na, "", color=color.blue,          textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+var label lbSL = label.new(na, na, "", color=color.red,           textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+var label lbT1 = label.new(na, na, "", color=color.green,         textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+var label lbT2 = label.new(na, na, "", color=color.green,         textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+var label lbT3 = label.new(na, na, "", color=color.green,         textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+var label lbT4 = label.new(na, na, "", color=color.rgb(0,100,0),  textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+var label lbT5 = label.new(na, na, "", color=color.rgb(0, 70, 0), textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+
 // 쿨다운 체크
 coolOk = (bar_index - lastBar) >= cooldown
 
@@ -158,6 +171,30 @@ if useBE and t1Hit and not beMoved
     beMoved   := true
 
 // ══════════════════════════════════════════════════════
+//  SL 도달 감지 및 상태 초기화
+// ══════════════════════════════════════════════════════
+slHit = lastSig != 0 and ((lastSig == 1 and low <= currentSL) or (lastSig == -1 and high >= currentSL))
+
+if slHit
+    label.new(bar_index, lastSig == 1 ? low : high,
+              "SL HIT\n" + str.tostring(currentSL, "#.##"),
+              color=color.red, textcolor=color.white,
+              style=lastSig == 1 ? label.style_label_up : label.style_label_down,
+              size=size.normal)
+    line.delete(lE),  line.delete(lSL)
+    line.delete(lT1), line.delete(lT2), line.delete(lT3), line.delete(lT4), line.delete(lT5)
+    label.set_text(lbE,  ""), label.set_text(lbSL, "")
+    label.set_text(lbT1, ""), label.set_text(lbT2, ""), label.set_text(lbT3, "")
+    label.set_text(lbT4, ""), label.set_text(lbT5, "")
+    lastSig  := 0
+    beMoved  := false
+    t1Hit    := false
+    t2Hit    := false
+    t3Hit    := false
+    t4Hit    := false
+    t5Hit    := false
+
+// ══════════════════════════════════════════════════════
 //  리테스트 감지
 // ══════════════════════════════════════════════════════
 isRetest = (lastSig == 1 and low <= emaF and low > emaS) or (lastSig == -1 and high >= emaF and high < emaS)
@@ -182,20 +219,8 @@ plotshape(triggerBuy,  title="BUY",  text="BUY",  style=shape.labelup,   locatio
 plotshape(triggerSell, title="SELL", text="SELL", style=shape.labeldown, location=location.abovebar, color=color.red,   textcolor=color.white, size=size.small)
 
 // ══════════════════════════════════════════════════════
-//  TP / SL 라인
+//  TP / SL 라인 생성
 // ══════════════════════════════════════════════════════
-color c_tq = #40E0D0
-var line lE = na, var line lSL = na
-var line lT1 = na, var line lT2 = na, var line lT3 = na, var line lT4 = na, var line lT5 = na
-
-var label lbE  = label.new(na, na, "", color=color.blue,          textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
-var label lbSL = label.new(na, na, "", color=color.red,           textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
-var label lbT1 = label.new(na, na, "", color=color.green,         textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
-var label lbT2 = label.new(na, na, "", color=color.green,         textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
-var label lbT3 = label.new(na, na, "", color=color.green,         textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
-var label lbT4 = label.new(na, na, "", color=color.rgb(0,100,0),  textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
-var label lbT5 = label.new(na, na, "", color=color.rgb(0, 70, 0), textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
-
 if triggerBuy or triggerSell
     line.delete(lE), line.delete(lSL)
     line.delete(lT1), line.delete(lT2), line.delete(lT3), line.delete(lT4), line.delete(lT5)
@@ -286,3 +311,4 @@ alertcondition(triggerSell, "SELL 신호", "Sniper V.03 — EMA 데드크로스 
 alertcondition(t1Hit and not t1Hit[1], "TP1 달성", "TP1 달성 — SL 손익분기점으로 이동")
 alertcondition(t3Hit and not t3Hit[1], "TP3 달성", "TP3 달성 — 부분 익절 고려")
 alertcondition(t5Hit and not t5Hit[1], "TP5 달성", "TP5 완전 달성")
+alertcondition(slHit, "SL 도달", "Stop Loss 도달 — 포지션 청산")
