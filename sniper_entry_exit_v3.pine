@@ -1,5 +1,5 @@
 //@version=5
-// © KhanSaab - Improved V.03 (EMA 기간 설정 + 필터 강화 + 손익분기점 이동)
+// © KhanSaab - Improved V.03b (손익분기점 즉시이동 제거)
 indicator("Sniper Entry/Exit V.03", overlay=true, max_labels_count=500, max_boxes_count=500, max_bars_back=1000)
 
 // ══════════════════════════════════════════════════════
@@ -18,7 +18,7 @@ cooldown  = input.int(5,    "쿨다운 (최소 봉 수)", minval=1, maxval=50, g
 
 groupRisk = "리스크 관리"
 atrMult   = input.float(1.5, "SL ATR 배수", minval=0.1, step=0.1, group=groupRisk)
-useBE     = input.bool(true, "TP1 달성 시 SL → 손익분기점 이동", group=groupRisk)
+beTrigger = input.string("없음", "손익분기점 이동 기준 (TP 도달 시)", options=["없음","TP2","TP3"], group=groupRisk)
 
 groupVis  = "화면 설정"
 dashSz    = input.string("small", "대시보드 글자 크기", options=["tiny","small","normal","large"], group=groupVis)
@@ -165,8 +165,9 @@ if lastSig == -1
     if low <= t5
         t5Hit := true
 
-// TP1 달성 시 SL → 손익분기점
-if useBE and t1Hit and not beMoved
+// 손익분기점 이동 (TP2 또는 TP3 도달 후 선택적으로 이동)
+bool beCond = (beTrigger == "TP2" and t2Hit) or (beTrigger == "TP3" and t3Hit)
+if beCond and not beMoved
     currentSL := entryP
     beMoved   := true
 
@@ -299,16 +300,16 @@ if barstate.islast
 
     f_row(d, 11, "ADX 필터",   adxFiltTxt,  adxFiltCol)
     f_row(d, 12, "점수 필터",  scoreFiltTxt, scoreFiltCol)
-    f_row(d, 13, "SL 상태",    beMoved ? "손익분기점" : "원래 SL", beMoved ? color.blue : color.red)
+    f_row(d, 13, "SL 상태",    beMoved ? "손익분기점" : "원래 SL (" + beTrigger + "후 이동)", beMoved ? color.blue : color.red)
     f_row(d, 14, "EMA 설정",   str.tostring(emaFast) + " / " + str.tostring(emaSlow), color.black)
-    f_row(d, 15, "Version",    "SNIPER V.03", color.blue)
+    f_row(d, 15, "Version",    "SNIPER V.03b", color.blue)
 
 // ══════════════════════════════════════════════════════
 //  알림
 // ══════════════════════════════════════════════════════
 alertcondition(triggerBuy,  "BUY 신호",  "Sniper V.03 — EMA 골든크로스 + 필터 통과 (매수)")
 alertcondition(triggerSell, "SELL 신호", "Sniper V.03 — EMA 데드크로스 + 필터 통과 (매도)")
-alertcondition(t1Hit and not t1Hit[1], "TP1 달성", "TP1 달성 — SL 손익분기점으로 이동")
+alertcondition(t1Hit and not t1Hit[1], "TP1 달성", "TP1 달성")
 alertcondition(t3Hit and not t3Hit[1], "TP3 달성", "TP3 달성 — 부분 익절 고려")
 alertcondition(t5Hit and not t5Hit[1], "TP5 달성", "TP5 완전 달성")
 alertcondition(slHit, "SL 도달", "Stop Loss 도달 — 포지션 청산")
