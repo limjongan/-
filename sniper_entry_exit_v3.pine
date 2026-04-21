@@ -1,0 +1,288 @@
+//@version=5
+// © KhanSaab - Improved V.03 (EMA 기간 설정 + 필터 강화 + 손익분기점 이동)
+indicator("Sniper Entry/Exit V.03", overlay=true, max_labels_count=500, max_boxes_count=500, max_bars_back=1000)
+
+// ══════════════════════════════════════════════════════
+//  설정 그룹
+// ══════════════════════════════════════════════════════
+groupMA   = "이동평균선 설정"
+emaFast   = input.int(9,  "빠른 EMA 기간", minval=3,  maxval=100, group=groupMA)
+emaSlow   = input.int(21, "느린 EMA 기간", minval=5,  maxval=500, group=groupMA)
+
+groupFilt = "신호 필터"
+adxThr    = input.int(20,   "ADX 최소값 (이상일 때 신호)", minval=5, maxval=50, group=groupFilt)
+scoreThr  = input.int(57,   "점수 최소값 % (4/7 = 57)", minval=30, maxval=100, group=groupFilt)
+useAdx    = input.bool(true, "ADX 필터 사용", group=groupFilt)
+useScore  = input.bool(true, "점수 필터 사용", group=groupFilt)
+cooldown  = input.int(5,    "쿨다운 (최소 봉 수)", minval=1, maxval=50, group=groupFilt)
+
+groupRisk = "리스크 관리"
+atrMult   = input.float(1.5, "SL ATR 배수", minval=0.1, step=0.1, group=groupRisk)
+useBE     = input.bool(true, "TP1 달성 시 SL → 손익분기점 이동", group=groupRisk)
+
+groupVis  = "화면 설정"
+dashSz    = input.string("small", "대시보드 글자 크기", options=["tiny","small","normal","large"], group=groupVis)
+tradeSz   = input.string("small", "레이블 글자 크기",   options=["tiny","small","normal","large"], group=groupVis)
+ribOp     = input.int(75, "EMA 리본 투명도", minval=0, maxval=100, group=groupVis)
+lblOff    = input.int(12, "레이블 오른쪽 거리 (봉)", minval=1, group=groupVis)
+
+// ══════════════════════════════════════════════════════
+//  글자 크기 헬퍼
+// ══════════════════════════════════════════════════════
+f_sz(s) =>
+    if s == "tiny"
+        size.tiny
+    else if s == "small"
+        size.small
+    else if s == "large"
+        size.large
+    else
+        size.normal
+
+// ══════════════════════════════════════════════════════
+//  지표 계산
+// ══════════════════════════════════════════════════════
+emaF   = ta.ema(close, emaFast)
+emaS   = ta.ema(close, emaSlow)
+vwapV  = ta.vwap(hlc3)
+atr    = ta.atr(14)
+rsiVal = ta.rsi(close, 14)
+rsi5m  = request.security(syminfo.tickerid, "5", ta.rsi(close, 14), lookahead=barmerge.lookahead_off)
+[m, s, _]    = ta.macd(close, 12, 26, 9)
+[_, _, adxV] = ta.dmi(14, 14)
+volAvg = ta.sma(volume, 20)
+
+// ══════════════════════════════════════════════════════
+//  7점 점수 시스템
+// ══════════════════════════════════════════════════════
+float bScore = 0
+bScore += close  > vwapV              ? 1 : 0
+bScore += rsiVal > 50                 ? 1 : 0
+bScore += m      > s                  ? 1 : 0
+bScore += emaF   > emaS               ? 1 : 0
+bScore += adxV   > 25 and close > emaF ? 1 : 0
+bScore += volume > volAvg and close > open ? 1 : 0
+bScore += rsi5m  > 50                 ? 1 : 0
+float bullPct = (bScore / 7) * 100
+
+float rScore = 0
+rScore += close  < vwapV              ? 1 : 0
+rScore += rsiVal < 50                 ? 1 : 0
+rScore += m      < s                  ? 1 : 0
+rScore += emaF   < emaS               ? 1 : 0
+rScore += adxV   > 25 and close < emaF ? 1 : 0
+rScore += volume > volAvg and close < open ? 1 : 0
+rScore += rsi5m  < 50                 ? 1 : 0
+float bearPct = (rScore / 7) * 100
+
+// ══════════════════════════════════════════════════════
+//  마켓 바이어스
+// ══════════════════════════════════════════════════════
+float diff = bullPct - bearPct
+string biasText = diff >= 40 ? "STRONG BULL" : diff <= -40 ? "STRONG BEAR" : diff > 0 ? "MILD BULL" : "MILD BEAR"
+color  biasCol  = diff >= 40 ? color.green   : diff <= -40 ? color.red     : color.gray
+
+// ══════════════════════════════════════════════════════
+//  신호 로직
+// ══════════════════════════════════════════════════════
+var int   lastSig  = 0
+var int   lastBar  = -999
+var float entryP   = 0.0
+var float slP      = 0.0
+var float currentSL = 0.0
+var float t1 = 0.0, var float t2 = 0.0, var float t3 = 0.0, var float t4 = 0.0, var float t5 = 0.0
+var bool  t1Hit = false, var bool t2Hit = false, var bool t3Hit = false, var bool t4Hit = false, var bool t5Hit = false
+var bool  beMoved = false
+
+// 쿨다운 체크
+coolOk = (bar_index - lastBar) >= cooldown
+
+// 필터 체크
+adxOk     = not useAdx   or adxV > adxThr
+bullOk    = not useScore  or bullPct >= scoreThr
+bearOk    = not useScore  or bearPct >= scoreThr
+
+// 크로스 + 필터 적용
+rawBuy  = ta.crossover(emaF, emaS)
+rawSell = ta.crossunder(emaF, emaS)
+triggerBuy  = rawBuy  and lastSig <= 0 and coolOk and adxOk and bullOk
+triggerSell = rawSell and lastSig >= 0 and coolOk and adxOk and bearOk
+
+if triggerBuy or triggerSell
+    lastSig  := triggerBuy ? 1 : -1
+    lastBar  := bar_index
+    entryP   := close
+    float risk = atr * atrMult
+    slP      := triggerBuy ? entryP - risk : entryP + risk
+    currentSL := slP
+    t1 := triggerBuy ? entryP + risk       : entryP - risk
+    t2 := triggerBuy ? entryP + risk * 2   : entryP - risk * 2
+    t3 := triggerBuy ? entryP + risk * 3   : entryP - risk * 3
+    t4 := triggerBuy ? entryP + risk * 4   : entryP - risk * 4
+    t5 := triggerBuy ? entryP + risk * 5   : entryP - risk * 5
+    t1Hit := false
+    t2Hit := false
+    t3Hit := false
+    t4Hit := false
+    t5Hit := false
+    beMoved := false
+
+// TP 달성 감지
+if lastSig == 1
+    if high >= t1
+        t1Hit := true
+    if high >= t2
+        t2Hit := true
+    if high >= t3
+        t3Hit := true
+    if high >= t4
+        t4Hit := true
+    if high >= t5
+        t5Hit := true
+
+if lastSig == -1
+    if low <= t1
+        t1Hit := true
+    if low <= t2
+        t2Hit := true
+    if low <= t3
+        t3Hit := true
+    if low <= t4
+        t4Hit := true
+    if low <= t5
+        t5Hit := true
+
+// TP1 달성 시 SL → 손익분기점
+if useBE and t1Hit and not beMoved
+    currentSL := entryP
+    beMoved   := true
+
+// ══════════════════════════════════════════════════════
+//  리테스트 감지
+// ══════════════════════════════════════════════════════
+isRetest = (lastSig == 1 and low <= emaF and low > emaS) or (lastSig == -1 and high >= emaF and high < emaS)
+
+// ══════════════════════════════════════════════════════
+//  EMA 라인 + 리본
+// ══════════════════════════════════════════════════════
+pF = plot(emaF, "EMA Fast", color=color.new(color.green, 20), linewidth=1)
+pS = plot(emaS, "EMA Slow", color=color.new(color.red,   20), linewidth=2)
+fill(pF, pS, color=emaF > emaS ? color.new(color.green, 100 - ribOp) : color.new(color.red, 100 - ribOp))
+plot(vwapV, "VWAP", color=close > vwapV ? color.green : color.red, linewidth=2)
+
+// ══════════════════════════════════════════════════════
+//  캔들 색상
+// ══════════════════════════════════════════════════════
+barcolor(triggerBuy or triggerSell ? color.black : isRetest ? color.orange : na)
+
+// ══════════════════════════════════════════════════════
+//  신호 마커
+// ══════════════════════════════════════════════════════
+plotshape(triggerBuy,  title="BUY",  text="BUY",  style=shape.labelup,   location=location.belowbar, color=color.green, textcolor=color.white, size=size.small)
+plotshape(triggerSell, title="SELL", text="SELL", style=shape.labeldown, location=location.abovebar, color=color.red,   textcolor=color.white, size=size.small)
+
+// ══════════════════════════════════════════════════════
+//  TP / SL 라인
+// ══════════════════════════════════════════════════════
+color c_tq = #40E0D0
+var line lE = na, var line lSL = na
+var line lT1 = na, var line lT2 = na, var line lT3 = na, var line lT4 = na, var line lT5 = na
+
+var label lbE  = label.new(na, na, "", color=color.blue,          textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+var label lbSL = label.new(na, na, "", color=color.red,           textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+var label lbT1 = label.new(na, na, "", color=color.green,         textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+var label lbT2 = label.new(na, na, "", color=color.green,         textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+var label lbT3 = label.new(na, na, "", color=color.green,         textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+var label lbT4 = label.new(na, na, "", color=color.rgb(0,100,0),  textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+var label lbT5 = label.new(na, na, "", color=color.rgb(0, 70, 0), textcolor=color.white, style=label.style_label_left, size=f_sz(tradeSz))
+
+if triggerBuy or triggerSell
+    line.delete(lE), line.delete(lSL)
+    line.delete(lT1), line.delete(lT2), line.delete(lT3), line.delete(lT4), line.delete(lT5)
+    lE  := line.new(bar_index, entryP, bar_index, entryP, color=color.blue,          width=2, extend=extend.right)
+    lSL := line.new(bar_index, slP,    bar_index, slP,    color=color.red,            width=2, extend=extend.right)
+    lT1 := line.new(bar_index, t1,     bar_index, t1,     color=color.green,          style=line.style_dashed, extend=extend.right)
+    lT2 := line.new(bar_index, t2,     bar_index, t2,     color=color.green,          style=line.style_dashed, extend=extend.right)
+    lT3 := line.new(bar_index, t3,     bar_index, t3,     color=color.green,          style=line.style_dashed, extend=extend.right)
+    lT4 := line.new(bar_index, t4,     bar_index, t4,     color=color.rgb(0,100,0),   width=2, extend=extend.right)
+    lT5 := line.new(bar_index, t5,     bar_index, t5,     color=color.rgb(0, 70, 0),  width=3, extend=extend.right)
+
+if lastSig != 0
+    int tX = bar_index + lblOff
+
+    // SL 라인 실시간 갱신 (손익분기점 이동 반영)
+    if not na(lSL)
+        line.set_y1(lSL, currentSL)
+        line.set_y2(lSL, currentSL)
+
+    // TP 달성 색 변경
+    slColor = beMoved ? color.blue : color.red
+    if not na(lSL)
+        line.set_color(lSL, slColor)
+    if not na(lT1)
+        line.set_color(lT1, t1Hit ? c_tq : color.green)
+    if not na(lT2)
+        line.set_color(lT2, t2Hit ? c_tq : color.green)
+    if not na(lT3)
+        line.set_color(lT3, t3Hit ? c_tq : color.green)
+    if not na(lT4)
+        line.set_color(lT4, t4Hit ? c_tq : color.rgb(0,100,0))
+    if not na(lT5)
+        line.set_color(lT5, t5Hit ? c_tq : color.rgb(0,70,0))
+
+    slTxt = beMoved ? "SL→BE: " + str.tostring(currentSL, "#.##") : "SL: " + str.tostring(currentSL, "#.##")
+
+    label.set_xy(lbE,  tX, entryP), label.set_text(lbE,  "ENTRY: " + str.tostring(entryP, "#.##"))
+    label.set_xy(lbSL, tX, currentSL), label.set_text(lbSL, slTxt)
+    label.set_color(lbSL, beMoved ? color.blue : color.red)
+    label.set_xy(lbT1, tX, t1), label.set_text(lbT1, "TP1: " + str.tostring(t1, "#.##") + (t1Hit ? " HIT" : ""))
+    label.set_xy(lbT2, tX, t2), label.set_text(lbT2, "TP2: " + str.tostring(t2, "#.##") + (t2Hit ? " HIT" : ""))
+    label.set_xy(lbT3, tX, t3), label.set_text(lbT3, "TP3: " + str.tostring(t3, "#.##") + (t3Hit ? " HIT" : ""))
+    label.set_xy(lbT4, tX, t4), label.set_text(lbT4, "TP4: " + str.tostring(t4, "#.##") + (t4Hit ? " HIT" : ""))
+    label.set_xy(lbT5, tX, t5), label.set_text(lbT5, "TP5: " + str.tostring(t5, "#.##") + (t5Hit ? " HIT" : ""))
+
+// ══════════════════════════════════════════════════════
+//  대시보드
+// ══════════════════════════════════════════════════════
+f_row(_t, _r, _title, _val, _col) =>
+    table.cell(_t, 0, _r, _title, text_color=color.black, text_halign=text.align_left,  text_size=dashSz)
+    table.cell(_t, 1, _r, _val,   text_color=_col,        text_halign=text.align_right, text_size=dashSz)
+
+var table d = table.new(position.middle_left, 2, 16, bgcolor=color.new(#FFF9C4, 10), border_width=1, border_color=color.new(color.gray, 60))
+
+if barstate.islast
+    table.cell(d, 0, 0, "BULL SCORE", text_color=color.white, bgcolor=color.green, text_size=dashSz)
+    table.cell(d, 1, 0, str.tostring(bullPct, "#") + "%", text_color=color.white, bgcolor=color.green, text_size=dashSz)
+    table.cell(d, 0, 1, "BEAR SCORE", text_color=color.white, bgcolor=color.red, text_size=dashSz)
+    table.cell(d, 1, 1, str.tostring(bearPct, "#") + "%", text_color=color.white, bgcolor=color.red, text_size=dashSz)
+    table.cell(d, 0, 2, "MARKET BIAS", text_color=color.white, bgcolor=color.black, text_size=dashSz)
+    table.cell(d, 1, 2, biasText, text_color=color.white, bgcolor=biasCol, text_size=dashSz)
+
+    f_row(d, 3,  "Price/VWAP",  close > vwapV ? "ABOVE" : "BELOW",         close > vwapV ? color.green : color.red)
+    f_row(d, 4,  "RSI (14)",    str.tostring(rsiVal, "#.#"),                rsiVal > 50 ? color.green : color.red)
+    f_row(d, 5,  "MACD Trend",  m > s ? "BULL" : "BEAR",                   m > s ? color.green : color.red)
+    f_row(d, 6,  "ADX",         str.tostring(adxV, "#.#"),                  adxV > adxThr ? color.green : color.gray)
+    f_row(d, 7,  "EMA 정렬",    emaF > emaS ? "정배열" : "역배열",           emaF > emaS ? color.green : color.red)
+    f_row(d, 8,  "ATR",         str.tostring(atr, "#.##"),                  color.black)
+    f_row(d, 9,  "거래량",      volume > volAvg ? "HIGH" : "LOW",           volume > volAvg ? color.green : color.gray)
+    f_row(d, 10, "5m RSI",      str.tostring(rsi5m, "#.#"),                 rsi5m > 50 ? color.green : color.red)
+
+    adxFiltTxt  = useAdx   ? (adxV > adxThr ? "통과" : "차단") : "미사용"
+    adxFiltCol  = useAdx   ? (adxV > adxThr ? color.green : color.red) : color.gray
+    scoreFiltTxt = useScore ? (bullPct >= scoreThr or bearPct >= scoreThr ? "통과" : "차단") : "미사용"
+    scoreFiltCol = useScore ? (bullPct >= scoreThr or bearPct >= scoreThr ? color.green : color.red) : color.gray
+
+    f_row(d, 11, "ADX 필터",   adxFiltTxt,  adxFiltCol)
+    f_row(d, 12, "점수 필터",  scoreFiltTxt, scoreFiltCol)
+    f_row(d, 13, "SL 상태",    beMoved ? "손익분기점" : "원래 SL", beMoved ? color.blue : color.red)
+    f_row(d, 14, "EMA 설정",   str.tostring(emaFast) + " / " + str.tostring(emaSlow), color.black)
+    f_row(d, 15, "Version",    "SNIPER V.03", color.blue)
+
+// ══════════════════════════════════════════════════════
+//  알림
+// ══════════════════════════════════════════════════════
+alertcondition(triggerBuy,  "BUY 신호",  "Sniper V.03 — EMA 골든크로스 + 필터 통과 (매수)")
+alertcondition(triggerSell, "SELL 신호", "Sniper V.03 — EMA 데드크로스 + 필터 통과 (매도)")
+alertcondition(t1Hit and not t1Hit[1], "TP1 달성", "TP1 달성 — SL 손익분기점으로 이동")
+alertcondition(t3Hit and not t3Hit[1], "TP3 달성", "TP3 달성 — 부분 익절 고려")
+alertcondition(t5Hit and not t5Hit[1], "TP5 달성", "TP5 완전 달성")
