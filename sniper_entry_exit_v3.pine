@@ -25,6 +25,10 @@ dashSz    = input.string("small", "대시보드 글자 크기", options=["tiny",
 tradeSz   = input.string("small", "레이블 글자 크기",   options=["tiny","small","normal","large"], group=groupVis)
 ribOp     = input.int(75, "EMA 리본 투명도", minval=0, maxval=100, group=groupVis)
 lblOff    = input.int(12, "레이블 오른쪽 거리 (봉)", minval=1, group=groupVis)
+showVwap  = input.bool(true, "VWAP 표시", group=groupVis)
+vwapColUp = input.color(#2196F3, "VWAP 색상 (가격 위)", group=groupVis)
+vwapColDn = input.color(#FF6D00, "VWAP 색상 (가격 아래)", group=groupVis)
+vwapWid   = input.int(2, "VWAP 선 굵기", minval=1, maxval=5, group=groupVis)
 
 // ══════════════════════════════════════════════════════
 //  글자 크기 헬퍼
@@ -206,7 +210,7 @@ isRetest = (lastSig == 1 and low <= emaF and low > emaS) or (lastSig == -1 and h
 pF = plot(emaF, "EMA Fast", color=color.new(color.green, 20), linewidth=1)
 pS = plot(emaS, "EMA Slow", color=color.new(color.red,   20), linewidth=2)
 fill(pF, pS, color=emaF > emaS ? color.new(color.green, 100 - ribOp) : color.new(color.red, 100 - ribOp))
-plot(vwapV, "VWAP", color=close > vwapV ? color.green : color.red, linewidth=2)
+plot(vwapV, "VWAP", color=showVwap ? (close > vwapV ? vwapColUp : vwapColDn) : na, linewidth=vwapWid)
 
 // ══════════════════════════════════════════════════════
 //  캔들 색상
