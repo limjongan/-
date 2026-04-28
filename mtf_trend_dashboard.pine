@@ -5,8 +5,8 @@ indicator('MTF 추세 대시보드', shorttitle='MTF Trend', overlay=true)
 //  설정
 // ══════════════════════════════════════════════════════
 grp       = '지표 설정'
-fastLen   = input.int(8,   '단기 DEMA 기간', minval=1, maxval=100, group=grp)
-slowLen   = input.int(21,  '장기 DEMA 기간', minval=1, maxval=100, group=grp)
+fastLen   = input.int(21,  '단기 DEMA 기간', minval=1, maxval=100, group=grp)
+slowLen   = input.int(55,  '장기 DEMA 기간', minval=1, maxval=100, group=grp)
 trendLen  = input.int(233, 'EMA 필터 기간',  minval=1, maxval=500, group=grp)
 adxLen    = input.int(14,  'ADX 기간',       minval=5, maxval=50,  group=grp)
 adxWeak   = input.int(20,  'ADX 보통 기준',  minval=5, maxval=50,  group=grp)
@@ -14,6 +14,12 @@ adxStrong = input.int(25,  'ADX 강한 기준',  minval=5, maxval=50,  group=grp
 grpTbl    = '테이블 설정'
 tblPos    = input.string('top_right', '위치', options=['top_right','top_left','bottom_right','bottom_left'], group=grpTbl)
 tblSize   = input.string('small', '크기', options=['tiny','small','normal','large'], group=grpTbl)
+
+// ══════════════════════════════════════════════════════
+//  색상 상수
+// ══════════════════════════════════════════════════════
+C_UP   = color.new(#1B5E20, 0)   // 짙은 녹색 (상승)
+C_DN   = color.new(color.red, 0) // 빨강 (하락)
 
 // ══════════════════════════════════════════════════════
 //  헬퍼 함수
@@ -46,11 +52,11 @@ f_size(s) =>
 //  시간프레임 데이터 수집 함수
 // ══════════════════════════════════════════════════════
 f_trend() =>
-    d8   = dema(close, fastLen)
-    d21  = dema(close, slowLen)
+    d21  = dema(close, fastLen)
+    d55  = dema(close, slowLen)
     e233 = ta.ema(close, trendLen)
     [_, _, adxV] = ta.dmi(adxLen, adxLen)
-    [close > e233, d8 > d21, adxV]
+    [close > e233, d21 > d55, adxV]
 
 // ══════════════════════════════════════════════════════
 //  종합 판단 함수
@@ -61,39 +67,36 @@ getJudge(above, up, adxV) =>
           above and not up                    ? '↗ 상승중약화' :
           not above and not up and adxV >= adxStrong ? '💥 강한하락' :
           not above and not up                ? '▼ 하락' : '↘ 하락중약화'
-    col = above and up and adxV >= adxStrong  ? color.lime :
-          above and up                         ? color.new(color.lime, 30) :
+    col = above and up and adxV >= adxStrong  ? C_UP :
+          above and up                         ? color.new(#1B5E20, 20) :
           above and not up                     ? color.yellow :
-          not above and not up and adxV >= adxStrong ? color.red :
-          not above and not up                 ? color.new(color.red, 30) : color.orange
+          not above and not up and adxV >= adxStrong ? C_DN :
+          not above and not up                 ? color.new(color.red, 20) : color.orange
     [txt, col]
 
 // ══════════════════════════════════════════════════════
-//  시간프레임별 데이터 요청
+//  시간프레임별 데이터 요청 (1h, 4h, 12h, 일봉)
 // ══════════════════════════════════════════════════════
-[a5,   u5,   x5]   = request.security(syminfo.tickerid, "5",   f_trend())
-[a15,  u15,  x15]  = request.security(syminfo.tickerid, "15",  f_trend())
 [a60,  u60,  x60]  = request.security(syminfo.tickerid, "60",  f_trend())
 [a240, u240, x240] = request.security(syminfo.tickerid, "240", f_trend())
 [a720, u720, x720] = request.security(syminfo.tickerid, "720", f_trend())
 [aD,   uD,   xD]   = request.security(syminfo.tickerid, "1D",  f_trend())
-[aW,   uW,   xW]   = request.security(syminfo.tickerid, "1W",  f_trend())
 
 // ══════════════════════════════════════════════════════
-//  테이블 생성
+//  테이블 생성  (5열 × 6행: 헤더 + 4봉 + 전체)
 // ══════════════════════════════════════════════════════
-var table tbl = table.new(f_pos(tblPos), 5, 9,
+var table tbl = table.new(f_pos(tblPos), 5, 6,
      bgcolor=color.new(color.black, 78),
      border_width=1, border_color=color.new(color.gray, 55))
 
 // ══════════════════════════════════════════════════════
-//  행 그리기 함수 — if 블록 밖 최상위 레벨에 정의
+//  행 그리기 함수
 // ══════════════════════════════════════════════════════
 drawRow(row, nm, ab, up, adxV, sz) =>
     [jt, jc] = getJudge(ab, up, adxV)
-    ac = ab   ? color.lime : color.red
-    uc = up   ? color.lime : color.red
-    xc = adxV >= adxStrong ? color.lime : adxV >= adxWeak ? color.yellow : color.gray
+    ac = ab   ? C_UP : C_DN
+    uc = up   ? C_UP : C_DN
+    xc = adxV >= adxStrong ? C_UP : adxV >= adxWeak ? color.yellow : color.gray
     table.cell(tbl, 0, row, nm,                         text_color=color.silver,        text_size=sz)
     table.cell(tbl, 1, row, ab?'▲ 위':'▼ 아래',          text_color=ac, text_size=sz,   bgcolor=color.new(ac, 88))
     table.cell(tbl, 2, row, up?'▲ 정배열':'▼ 역배열',     text_color=uc, text_size=sz)
@@ -115,30 +118,26 @@ if barstate.islast
     table.cell(tbl, 4, 0, '종합판단',             text_color=color.white, text_size=sz, bgcolor=hBg)
 
     // 각 시간프레임 행
-    drawRow(1, '5분',   a5,   u5,   x5,   sz)
-    drawRow(2, '15분',  a15,  u15,  x15,  sz)
-    drawRow(3, '1시간', a60,  u60,  x60,  sz)
-    drawRow(4, '4시간', a240, u240, x240, sz)
-    drawRow(5, '12시간',a720, u720, x720, sz)
-    drawRow(6, '일봉',  aD,   uD,   xD,   sz)
-    drawRow(7, '주봉',  aW,   uW,   xW,   sz)
+    drawRow(1, '1시간', a60,  u60,  x60,  sz)
+    drawRow(2, '4시간', a240, u240, x240, sz)
+    drawRow(3, '12시간',a720, u720, x720, sz)
+    drawRow(4, '일봉',  aD,   uD,   xD,   sz)
 
-    // 전체 합산
-    bullCnt = (a5   and u5   ? 1:0) + (a15  and u15  ? 1:0) + (a60  and u60  ? 1:0) +
-              (a240  and u240  ? 1:0) + (a720 and u720 ? 1:0) + (aD   and uD   ? 1:0) + (aW and uW ? 1:0)
-    bearCnt = (not a5   and not u5   ? 1:0) + (not a15  and not u15  ? 1:0) +
-              (not a60  and not u60  ? 1:0) + (not a240  and not u240  ? 1:0) +
-              (not a720 and not u720 ? 1:0) + (not aD   and not uD   ? 1:0) + (not aW and not uW ? 1:0)
+    // 전체 합산 (4개 기준)
+    bullCnt = (a60  and u60  ? 1:0) + (a240 and u240 ? 1:0) +
+              (a720 and u720 ? 1:0) + (aD   and uD   ? 1:0)
+    bearCnt = (not a60  and not u60  ? 1:0) + (not a240 and not u240 ? 1:0) +
+              (not a720 and not u720 ? 1:0) + (not aD  and not uD   ? 1:0)
 
-    totalTxt = bullCnt >= 5 ? '🚀 전체 상승 우세' :
-               bearCnt >= 5 ? '💥 전체 하락 우세' :
-               bullCnt > bearCnt ? '↗ 상승 우세 (' + str.tostring(bullCnt) + '/7)' :
-               bearCnt > bullCnt ? '↘ 하락 우세 (' + str.tostring(bearCnt) + '/7)' : '↔ 혼재'
-    totalCol = bullCnt >= 5 ? color.lime :
-               bearCnt >= 5 ? color.red  :
-               bullCnt > bearCnt ? color.new(color.lime, 20) :
-               bearCnt > bullCnt ? color.new(color.red,  20) : color.gray
+    totalTxt = bullCnt == 4 ? '🚀 전체 상승 우세' :
+               bearCnt == 4 ? '💥 전체 하락 우세' :
+               bullCnt > bearCnt ? '↗ 상승 우세 (' + str.tostring(bullCnt) + '/4)' :
+               bearCnt > bullCnt ? '↘ 하락 우세 (' + str.tostring(bearCnt) + '/4)' : '↔ 혼재'
+    totalCol = bullCnt == 4 ? C_UP :
+               bearCnt == 4 ? C_DN  :
+               bullCnt > bearCnt ? color.new(#1B5E20, 20) :
+               bearCnt > bullCnt ? color.new(color.red, 20) : color.gray
 
-    table.cell(tbl, 0, 8, '전체',    text_color=color.white, text_size=sz, bgcolor=color.new(totalCol, 60))
-    table.cell(tbl, 1, 8, totalTxt, text_color=totalCol,    text_size=sz, bgcolor=color.new(totalCol, 85))
-    table.merge_cells(tbl, 1, 8, 4, 8)
+    table.cell(tbl, 0, 5, '전체',    text_color=color.white, text_size=sz, bgcolor=color.new(totalCol, 60))
+    table.cell(tbl, 1, 5, totalTxt, text_color=totalCol,    text_size=sz, bgcolor=color.new(totalCol, 85))
+    table.merge_cells(tbl, 1, 5, 4, 5)
