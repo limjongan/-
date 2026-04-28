@@ -1,0 +1,178 @@
+//@version=5
+indicator('횡보구간 감지기', shorttitle='Range Detector', overlay=true)
+
+// ══════════════════════════════════════════════════════
+//  설정
+// ══════════════════════════════════════════════════════
+grpR = '횡보 기준'
+adxLen      = input.int(14,    'ADX 기간',              minval=5,  maxval=50,  group=grpR)
+adxThresh   = input.int(20,    'ADX 횡보 기준 (이하)',   minval=5,  maxval=40,  group=grpR)
+bbLen       = input.int(20,    '볼린저밴드 기간',        minval=5,  maxval=100, group=grpR)
+bbMult      = input.float(2.0, 'BB 배수',               minval=0.5,maxval=4.0, group=grpR)
+bbwRankLen  = input.int(100,   'BBW 백분위 기준 기간',   minval=20, maxval=300, group=grpR)
+bbwThresh   = input.float(30,  'BBW 백분위 기준 (이하%)',minval=5,  maxval=60,  group=grpR)
+atrLen      = input.int(14,    'ATR 기간',              minval=5,  maxval=50,  group=grpR)
+dcLen       = input.int(20,    'Donchian 범위 기간',     minval=5,  maxval=100, group=grpR)
+rangeATRMul = input.float(2.5, '범위/ATR 배수 기준 (이하)',minval=1.0,maxval=8.0,group=grpR)
+
+grpV = '표시 설정'
+showBg  = input.bool(true,        '횡보 배경색',   group=grpV)
+showBox = input.bool(true,        '횡보 박스',     group=grpV)
+showTbl = input.bool(true,        '정보 테이블',   group=grpV)
+tblPos  = input.string('top_right','테이블 위치',  options=['top_right','top_left','bottom_right','bottom_left'], group=grpV)
+
+// ══════════════════════════════════════════════════════
+//  ADX
+// ══════════════════════════════════════════════════════
+[_, _, adxVal] = ta.dmi(adxLen, adxLen)
+
+// ══════════════════════════════════════════════════════
+//  볼린저밴드 폭 백분위 (BBW Percentile Rank)
+// ══════════════════════════════════════════════════════
+[bbMid, bbUpper, bbLower] = ta.bb(close, bbLen, bbMult)
+bbw = (bbUpper - bbLower) / bbMid * 100
+
+bbwRank = 0.0
+for i = 0 to bbwRankLen - 1
+    if bbw[i] < bbw
+        bbwRank += 1
+bbwRank := bbwRank / bbwRankLen * 100
+
+// ══════════════════════════════════════════════════════
+//  ATR 및 Donchian 범위
+// ══════════════════════════════════════════════════════
+atrVal      = ta.atr(atrLen)
+dcHigh      = ta.highest(high, dcLen)
+dcLow       = ta.lowest(low,  dcLen)
+dcRange     = dcHigh - dcLow
+rangeRatio  = dcRange / atrVal
+
+// ══════════════════════════════════════════════════════
+//  횡보 조건 판단
+// ══════════════════════════════════════════════════════
+cond_adx   = adxVal    < adxThresh
+cond_bbw   = bbwRank   < bbwThresh
+cond_range = rangeRatio < rangeATRMul
+
+score = (cond_adx ? 1 : 0) + (cond_bbw ? 1 : 0) + (cond_range ? 1 : 0)
+
+isStrong   = score == 3  // 3개 조건 모두 충족
+isPartial  = score == 2  // 2개 조건 충족
+isSideways = score >= 2  // 횡보로 판단
+
+// ══════════════════════════════════════════════════════
+//  배경색
+// ══════════════════════════════════════════════════════
+bgCol = isStrong  ? color.new(color.blue, 88) :
+        isPartial ? color.new(color.gray, 90) : na
+bgcolor(showBg ? bgCol : na, title='횡보 배경')
+
+// ══════════════════════════════════════════════════════
+//  Donchian 범위 라인 (횡보 구간에서만 표시)
+// ══════════════════════════════════════════════════════
+plot(isSideways ? dcHigh : na, '범위 상단', color=color.new(color.orange, 20), linewidth=1, style=plot.style_stepline)
+plot(isSideways ? dcLow  : na, '범위 하단', color=color.new(color.orange, 20), linewidth=1, style=plot.style_stepline)
+plot(isSideways ? bbMid  : na, '중심선',    color=color.new(color.gray,   40), linewidth=1, style=plot.style_stepline)
+
+// ══════════════════════════════════════════════════════
+//  박스 (횡보 구간 시각화)
+// ══════════════════════════════════════════════════════
+var box  rangeBox  = na
+var int  boxStart  = na
+var float boxHigh  = na
+var float boxLow   = na
+
+if showBox
+    if isSideways and not isSideways[1]
+        boxStart := bar_index
+        boxHigh  := dcHigh
+        boxLow   := dcLow
+        rangeBox := box.new(boxStart, boxHigh, bar_index, boxLow,
+             border_color = color.new(color.orange, 30),
+             border_width = 1,
+             bgcolor      = color.new(color.orange, 92))
+
+    if isSideways
+        boxHigh := math.max(boxHigh, dcHigh)
+        boxLow  := math.min(boxLow,  dcLow)
+        box.set_right( rangeBox, bar_index)
+        box.set_top(   rangeBox, boxHigh)
+        box.set_bottom(rangeBox, boxLow)
+
+// ══════════════════════════════════════════════════════
+//  횡보 시작 / 탈출 신호
+// ══════════════════════════════════════════════════════
+enterRange = isSideways  and not isSideways[1]
+exitRange  = not isSideways and isSideways[1]
+
+plotshape(enterRange, '횡보 진입', shape.triangledown, location.abovebar,
+     color=color.new(color.blue, 20), size=size.small)
+plotshape(exitRange,  '횡보 탈출', shape.triangleup,   location.belowbar,
+     color=color.new(color.orange, 0), size=size.small)
+
+// ══════════════════════════════════════════════════════
+//  테이블
+// ══════════════════════════════════════════════════════
+f_pos(p) =>
+    p == 'top_left'     ? position.top_left     :
+    p == 'bottom_right' ? position.bottom_right :
+    p == 'bottom_left'  ? position.bottom_left  : position.top_right
+
+var table tbl = table.new(f_pos(tblPos), 3, 6,
+     bgcolor      = color.new(color.black, 75),
+     border_width = 1,
+     border_color = color.new(color.gray, 55))
+
+C_OK  = color.new(#1B5E20, 0)
+C_NG  = color.new(color.red, 0)
+
+if barstate.islast and showTbl
+    sz  = size.small
+    hBg = color.new(#0d1b2a, 10)
+
+    // 헤더
+    table.cell(tbl, 0, 0, '조건',  text_color=color.white, text_size=sz, bgcolor=hBg)
+    table.cell(tbl, 1, 0, '수치',  text_color=color.white, text_size=sz, bgcolor=hBg)
+    table.cell(tbl, 2, 0, '판정',  text_color=color.white, text_size=sz, bgcolor=hBg)
+
+    // ADX
+    adxC = cond_adx ? C_OK : C_NG
+    table.cell(tbl, 0, 1, 'ADX',
+         text_color=color.silver, text_size=sz)
+    table.cell(tbl, 1, 1, str.tostring(adxVal, '#.1') + ' / ' + str.tostring(adxThresh),
+         text_color=adxC, text_size=sz)
+    table.cell(tbl, 2, 1, cond_adx ? '✓ 추세없음' : '✗ 추세중',
+         text_color=adxC, text_size=sz)
+
+    // BBW 백분위
+    bbwC = cond_bbw ? C_OK : C_NG
+    table.cell(tbl, 0, 2, 'BBW 백분위',
+         text_color=color.silver, text_size=sz)
+    table.cell(tbl, 1, 2, str.tostring(bbwRank, '#.1') + '%',
+         text_color=bbwC, text_size=sz)
+    table.cell(tbl, 2, 2, cond_bbw ? '✓ 변동수축' : '✗ 변동확장',
+         text_color=bbwC, text_size=sz)
+
+    // 범위/ATR
+    rC = cond_range ? C_OK : C_NG
+    table.cell(tbl, 0, 3, '범위/ATR',
+         text_color=color.silver, text_size=sz)
+    table.cell(tbl, 1, 3, str.tostring(rangeRatio, '#.1') + 'x',
+         text_color=rC, text_size=sz)
+    table.cell(tbl, 2, 3, cond_range ? '✓ 범위좁음' : '✗ 범위넓음',
+         text_color=rC, text_size=sz)
+
+    // 구분선
+    table.cell(tbl, 0, 4, '──', text_color=color.gray, text_size=sz)
+    table.cell(tbl, 1, 4, '──', text_color=color.gray, text_size=sz)
+    table.cell(tbl, 2, 4, '──', text_color=color.gray, text_size=sz)
+
+    // 종합
+    judgeT = isStrong  ? '🔵 강한 횡보 (' + str.tostring(score) + '/3)' :
+             isPartial ? '⚪ 부분 횡보 (' + str.tostring(score) + '/3)' :
+                         '🟠 추세 진행 (' + str.tostring(score) + '/3)'
+    judgeC = isStrong  ? color.blue   :
+             isPartial ? color.silver : color.orange
+    table.cell(tbl, 0, 5, '종합',  text_color=color.white, text_size=sz, bgcolor=color.new(judgeC, 70))
+    table.cell(tbl, 1, 5, judgeT, text_color=judgeC,       text_size=sz, bgcolor=color.new(judgeC, 85))
+    table.merge_cells(tbl, 1, 5, 2, 5)
