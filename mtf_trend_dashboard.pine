@@ -52,11 +52,11 @@ f_size(s) =>
 //  시간프레임 데이터 수집 함수
 // ══════════════════════════════════════════════════════
 f_trend() =>
-    d21  = dema(close, fastLen)
-    d55  = dema(close, slowLen)
+    e21  = ta.ema(close, fastLen)
+    e55  = ta.ema(close, slowLen)
     e233 = ta.ema(close, trendLen)
     [_, _, adxV] = ta.dmi(adxLen, adxLen)
-    [close > e233, d21 > d55, adxV]
+    [close > e233, e21 > e55, adxV]
 
 // ══════════════════════════════════════════════════════
 //  종합 판단 함수
@@ -99,7 +99,7 @@ drawRow(row, nm, ab, up, adxV, sz) =>
     xc = adxV >= adxStrong ? C_UP : adxV >= adxWeak ? color.yellow : color.gray
     table.cell(tbl, 0, row, nm,                         text_color=color.silver,        text_size=sz)
     table.cell(tbl, 1, row, ab?'▲ 위':'▼ 아래',          text_color=ac, text_size=sz,   bgcolor=color.new(ac, 88))
-    table.cell(tbl, 2, row, up?'▲ 정배열':'▼ 역배열',     text_color=uc, text_size=sz)
+    table.cell(tbl, 2, row, up?'▲ EMA정배열':'▼ EMA역배열', text_color=uc, text_size=sz)
     table.cell(tbl, 3, row, str.tostring(adxV, '#.0'),  text_color=xc, text_size=sz)
     table.cell(tbl, 4, row, jt,                         text_color=jc, text_size=sz,   bgcolor=color.new(jc, 88))
 
@@ -113,7 +113,7 @@ if barstate.islast
     // 헤더
     table.cell(tbl, 0, 0, '시간봉',              text_color=color.white, text_size=sz, bgcolor=hBg)
     table.cell(tbl, 1, 0, 'EMA' + str.tostring(trendLen), text_color=color.white, text_size=sz, bgcolor=hBg)
-    table.cell(tbl, 2, 0, 'DEMA 배열',           text_color=color.white, text_size=sz, bgcolor=hBg)
+    table.cell(tbl, 2, 0, 'EMA 배열',            text_color=color.white, text_size=sz, bgcolor=hBg)
     table.cell(tbl, 3, 0, 'ADX',                 text_color=color.white, text_size=sz, bgcolor=hBg)
     table.cell(tbl, 4, 0, '종합판단',             text_color=color.white, text_size=sz, bgcolor=hBg)
 
